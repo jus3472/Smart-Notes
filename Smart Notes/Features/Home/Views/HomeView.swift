@@ -1,38 +1,25 @@
+// HomeView.swift
 import SwiftUI
+import CoreData
 
 struct HomeView: View {
-    @StateObject private var viewModel = HomeViewModel()
     
+    // 1. @FetchRequest 프로퍼티 선언
+    // 이 프로퍼티 래퍼가 Core Data의 변경 사항을 자동으로 감지하여 뷰를 새로고침합니다.
+    @FetchRequest private var recentNotes: FetchedResults<Note>
+
     var body: some View {
         NavigationView {
-            VStack {
-                // 최근 녹음 섹션
-                VStack(alignment: .leading) {
-                    Text("Recent Notes")
-                        .font(.headline)
-                        .padding(.horizontal)
-                    
-                    ScrollView {
-                        ForEach(viewModel.recentNotes) { note in
+            List {
+                Section(header: Text("Recent Notes").font(.headline)) {
+                    ForEach(recentNotes) { note in
+                        NavigationLink(destination: NoteEditorView(note: note)) {
                             NoteRowView(note: note)
-                                .padding(.horizontal)
                         }
                     }
                 }
-                
-                // 빠른 녹음 버튼
-                Button(action: {
-                    viewModel.startQuickRecording()
-                }) {
-                    Label("Quick Recording", systemImage: "mic.circle.fill")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-                .padding()
             }
+            .listStyle(InsetGroupedListStyle())
             .navigationTitle("Smart Notes")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -44,5 +31,25 @@ struct HomeView: View {
                 }
             }
         }
+    }
+    
+    // 2. init() 메서드에서 Fetch Request를 수동으로 구성
+    init() {
+        // 3. NSFetchRequest 객체 생성
+        let request: NSFetchRequest<Note> = Note.fetchRequest()
+        
+        // 4. 정렬 순서 설정 (가장 최근에 수정된 순서)
+        request.sortDescriptors = [
+            NSSortDescriptor(keyPath: \Note.updatedAt, ascending: false)
+        ]
+        
+        // 5. 'fetchLimit' (10개) 설정
+        request.fetchLimit = 10
+        
+        // 6. 위에서 만든 request로 _recentNotes 프로퍼티 래퍼를 초기화
+        _recentNotes = FetchRequest(
+            fetchRequest: request,
+            animation: .default
+        )
     }
 }
