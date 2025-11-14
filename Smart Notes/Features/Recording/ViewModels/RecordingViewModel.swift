@@ -2,7 +2,6 @@
 import SwiftUI
 import Combine
 
-// 1. 상태를 명확하게 관리하기 위한 Enum 정의
 enum RecordingState {
     case idle
     case recording
@@ -10,22 +9,26 @@ enum RecordingState {
 }
 
 class RecordingViewModel: ObservableObject {
-    // 2. 두 개의 Bool 대신 단일 상태(State) 변수 사용
     @Published var recordingState: RecordingState = .idle
     @Published var transcribedText = ""
     @Published var recordingTime = "00:00"
     
+    // 1. AudioRecorderService의 오디오 레벨을 받아올 @Published 변수 추가
+    @Published var currentAudioLevel: Float = 0.0
+    
     private let speechService = SpeechRecognizerService()
-    // private let audioRecorder = AudioRecorderService() // 코드에서 사용되지 않아 주석 처리
+    private let audioRecorder = AudioRecorderService() // ✅ AudioRecorderService 인스턴스 사용
     private var timer: Timer?
     private var seconds = 0
+    private var cancellables = Set<AnyCancellable>() // ✅ Combine 구독 관리를 위한 Set
     
     init() {
-        // 3. speechService의 상태를 직접 바인딩하는 대신, VM이 상태를 관리하도록 setupBindings 제거
-        // setupBindings()
+        // 2. AudioRecorderService의 audioLevel을 currentAudioLevel에 바인딩
+        audioRecorder.$audioLevel
+            .assign(to: \.currentAudioLevel, on: self)
+            .store(in: &cancellables)
     }
     
-    // 4. 메인 버튼(녹음/일시정지/재개)을 처리하는 통합 함수
     func handleMainButtonTap() {
         switch recordingState {
         case .idle:
@@ -40,37 +43,40 @@ class RecordingViewModel: ObservableObject {
     private func startRecording() {
         speechService.requestAuthorization()
         speechService.startTranscribing()
+        audioRecorder.startRecording() // ✅ 녹음 시작 시 AudioRecorderService 시작
         startTimer()
         recordingState = .recording
     }
     
-    // 5. 일시정지 로직 (SpeechService에 pause가 없다면 stop/start로 대체)
     private func pauseRecording() {
-        speechService.stopTranscribing() // HACK: SpeechService에 pause 기능이 없다고 가정
+        speechService.stopTranscribing()
+        audioRecorder.pauseRecording() // ✅ 녹음 일시정지 시 AudioRecorderService 일시정지
         pauseTimer()
         recordingState = .paused
     }
     
-    // 6. 재개 로직
     private func resumeRecording() {
-        speechService.startTranscribing() // HACK: SpeechService에 resume 기능이 없다고 가정
+        speechService.startTranscribing()
+        audioRecorder.resumeRecording() // ✅ 녹음 재개 시 AudioRecorderService 재개
         resumeTimer()
         recordingState = .recording
     }
-    
-    // 7. 녹음 완료 후 모든 상태를 초기화하는 함수
     func resetRecording() {
-        speechService.stopTranscribing()
-        timer?.invalidate()
-        timer = nil
-        seconds = 0
-        recordingTime = "00:00"
-        transcribedText = ""
-        recordingState = .idle
-    }
+            speechService.stopTranscribing()
+            audioRecorder.stopRecording()
+            
+            // 1. stopTimer() 대신 이 두 줄로 수정합니다.
+            timer?.invalidate()
+            timer = nil
+            
+            seconds = 0
+            recordingTime = "00:00"
+            transcribedText = ""
+            recordingState = .idle
+            currentAudioLevel = 0.0 // 오디오 레벨 초기화
+        }
     
-    // --- 타이머 로직 수정 ---
-    
+    // --- 타이머 로직은 기존과 동일 ---
     private func startTimer() {
         seconds = 0
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
@@ -96,4 +102,5 @@ class RecordingViewModel: ObservableObject {
         let seconds = self.seconds % 60
         self.recordingTime = String(format: "%02d:%02d", minutes, seconds)
     }
+    
 }

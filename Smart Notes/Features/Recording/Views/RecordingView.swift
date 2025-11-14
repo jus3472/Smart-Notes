@@ -8,9 +8,8 @@ struct RecordingView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
-                // ... (파형 뷰, 전사된 텍스트, 녹음 시간 표시는 동일) ...
-                
-                 AudioWaveformView()
+                // 1. AudioWaveformView에 viewModel을 전달
+                AudioWaveformView(viewModel: viewModel)
                     .frame(height: 100)
                     .padding()
                 
@@ -27,11 +26,9 @@ struct RecordingView: View {
                     .font(.largeTitle)
                     .monospacedDigit()
                 
-                // --- 컨트롤 버튼 (수정된 부분) ---
                 HStack(spacing: 40) {
-                    Spacer() // 버튼들을 중앙으로 정렬하기 위한 Spacer
+                    Spacer()
                     
-                    // 1. 메인 녹음/일시정지/재개 버튼
                     Button(action: {
                         viewModel.handleMainButtonTap()
                     }) {
@@ -41,7 +38,6 @@ struct RecordingView: View {
                             .foregroundColor(mainButtonColor)
                     }
                     
-                    // 2. 저장 버튼
                     Button(action: {
                         showingSaveDialog = true
                     }) {
@@ -50,20 +46,17 @@ struct RecordingView: View {
                             .frame(width: 50, height: 50)
                             .foregroundColor(.green)
                     }
-                    // 3. '일시정지' 상태일 때만 활성화
                     .disabled(viewModel.recordingState != .paused)
                     
-                    Spacer() // 버튼들을 중앙으로 정렬하기 위한 Spacer
+                    Spacer()
                 }
                 .padding()
             }
             .navigationTitle("Recording")
-            // 4. SaveNoteView가 닫힐 때가 아니라, '저장'이 성공했을 때만 리셋하도록 onSave 클로저 전달
             .sheet(isPresented: $showingSaveDialog) {
                 SaveNoteView(
                     transcribedText: viewModel.transcribedText,
                     onSave: {
-                        // 저장이 완료되면 ViewModel 상태를 리셋
                         viewModel.resetRecording()
                     }
                 )
@@ -71,16 +64,14 @@ struct RecordingView: View {
         }
     }
     
-    // --- View 로직 헬퍼 ---
-    
     private var mainButtonIcon: String {
         switch viewModel.recordingState {
         case .idle:
-            return "record.circle" // 시작
+            return "record.circle"
         case .recording:
-            return "pause.circle.fill" // 일시정지
+            return "pause.circle.fill"
         case .paused:
-            return "play.circle.fill" // 재개
+            return "play.circle.fill"
         }
     }
     
@@ -89,7 +80,7 @@ struct RecordingView: View {
         case .idle:
             return .gray
         case .recording, .paused:
-            return .blue // 일시정지/재개는 파란색으로 통일 (또는 .red)
+            return .blue
         }
     }
 }
