@@ -1,8 +1,9 @@
-//
-//  SNFolder.swift
-//  Smart Notes
-//
-//  Created by Wassabi K on 11/13/25.
-//
-
 import Foundation
+import FirebaseFirestore
+
+struct SNFolder: Identifiable, Codable {
+    var id: String = UUID().uuidString
+    var name: String
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
+}

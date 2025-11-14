@@ -1,8 +1,16 @@
-//
-//  RootView.swift
-//  Smart Notes
-//
-//  Created by Wassabi K on 11/13/25.
-//
+// RootView.swift
+import SwiftUI
 
-import Foundation
+struct RootView: View {
+    @EnvironmentObject var authViewModel: AuthViewModel
+    
+    var body: some View {
+        Group {
+            if authViewModel.isLoggedIn {
+                MainAppView()
+            } else {
+                AuthView()
+            }
+        }
+    }
+}

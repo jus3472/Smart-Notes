@@ -1,13 +1,22 @@
-// Features/Folders/Views/FolderDetailView.swift
+// FolderDetailView.swift
 import SwiftUI
 
 struct FolderDetailView: View {
-    let folder: Folder
+    @EnvironmentObject var notesViewModel: NotesViewModel
+    
+    let folder: SNFolder?   // nil이면 All Notes
     
     var body: some View {
+        let notes = notesViewModel.notes(in: folder)
+        
         List {
-            Text("Notes in \(folder.name ?? "Untitled")")
+            ForEach(notes) { note in
+                NoteRowView(note: note)
+            }
+            .onDelete { offsets in
+                notesViewModel.delete(at: offsets, in: folder)
+            }
         }
-        .navigationTitle(folder.name ?? "Folder")
+        .navigationTitle(folder?.name ?? "All Notes")
     }
 }

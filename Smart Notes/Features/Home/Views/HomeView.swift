@@ -14,7 +14,7 @@ struct HomeView: View {
                 Section(header: Text("Recent Notes").font(.headline)) {
                     ForEach(recentNotes) { note in
                         NavigationLink(destination: NoteEditorView(note: note)) {
-                            NoteRowView(note: note)
+                            CoreDataNoteRowView(note: note)
                         }
                     }
                 }

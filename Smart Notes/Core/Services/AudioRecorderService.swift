@@ -2,26 +2,21 @@
 import Foundation
 import AVFoundation
 import Combine
-
 class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDelegate {
     private var audioRecorder: AVAudioRecorder?
     private var audioSession = AVAudioSession.sharedInstance()
     private var meterTimer: Timer?
+
+    @Published var audioLevel: Float = 0.0
     
-    // 1. 현재 오디오 레벨을 외부에 발행(Publish)할 @Published 변수
-    @Published var audioLevel: Float = 0.0 // 0.0 (조용) ~ 1.0 (최대 볼륨)
-    
-    // 2. 녹음 파일 저장 경로 (임시 파일)
-    private var recordingURL: URL {
-        let filename = UUID().uuidString + ".m4a"
-        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(filename)
-    }
+    // 🔥 녹음된 최종 파일 URL (업로드용)
+    private(set) var finalRecordingURL: URL?
 
     override init() {
         super.init()
         setupAudioSession()
     }
-    
+
     private func setupAudioSession() {
         do {
             try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
@@ -30,81 +25,92 @@ class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDelegate 
             print("Failed to setup audio session: \(error.localizedDescription)")
         }
     }
-    
+
     func startRecording() {
-        // 기존 녹음 인스턴스가 있다면 정리
-        if audioRecorder?.isRecording == true {
-            audioRecorder?.stop()
-        }
-        
-        // 3. 음량 측정 설정을 포함한 녹음 설정
-        let settings = [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 12000,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
-            AVEncoderBitRateKey: 32000,
-            AVLinearPCMIsFloatKey: true,
-            AVLinearPCMIsBigEndianKey: false,
-            AVLinearPCMIsNonInterleaved: false
-        ] as [String : Any]
-        
+        // 기존 녹음 중지
+        audioRecorder?.stop()
+
+        // 🔥 새로운 파일 경로 생성
+        let filename = UUID().uuidString + ".m4a"
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(filename)
+
         do {
-            audioRecorder = try AVAudioRecorder(url: recordingURL, settings: settings)
+            let settings: [String : Any] = [
+                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                AVSampleRateKey: 12000,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            ]
+
+            audioRecorder = try AVAudioRecorder(url: url, settings: settings)
             audioRecorder?.delegate = self
-            audioRecorder?.isMeteringEnabled = true // ✅ 음량 측정 활성화
+            audioRecorder?.isMeteringEnabled = true
             audioRecorder?.prepareToRecord()
             audioRecorder?.record()
-            startMetering() // ✅ 미터링 타이머 시작
-            print("Recording started at: \(recordingURL)")
+            startMetering()
+
+            print("🎤 Recording started at:", url)
+
         } catch {
             print("Failed to start recording: \(error.localizedDescription)")
-            stopRecording()
         }
     }
-    
+
     func stopRecording() {
-        audioRecorder?.stop()
-        meterTimer?.invalidate() // ✅ 미터링 타이머 중지
+        guard let recorder = audioRecorder else { return }
+
+        recorder.stop()
+        meterTimer?.invalidate()
         meterTimer = nil
-        audioLevel = 0.0 // 음량 초기화
-        audioRecorder = nil
-        print("Recording stopped.")
+        audioLevel = 0.0
+
+        // 🔥 파일 생성이 완료될 때까지 약간 대기
+        let recordedURL = recorder.url
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            if FileManager.default.fileExists(atPath: recordedURL.path) {
+                print("✅ File exists, ready for upload:", recordedURL)
+                self.finalRecordingURL = recordedURL
+            } else {
+                print("❌ File does NOT exist yet")
+            }
+        }
+
+        // ❗ audioRecorder를 여기서 nil으로 만들면 안 됨!!
+        // audioRecorder = nil
     }
-    
+
     func pauseRecording() {
         audioRecorder?.pause()
-        meterTimer?.invalidate() // ✅ 미터링 타이머 중지
+        meterTimer?.invalidate()
         meterTimer = nil
-        print("Recording paused.")
     }
-    
+
     func resumeRecording() {
         audioRecorder?.record()
-        startMetering() // ✅ 미터링 타이머 재시작
-        print("Recording resumed.")
+        startMetering()
     }
-    
-    // 4. 음량 측정 타이머 시작
+
     private func startMetering() {
         meterTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            self?.audioRecorder?.updateMeters()
-            if let peakPower = self?.audioRecorder?.averagePower(forChannel: 0) {
-                // Core Audio Power to UI friendly 0-1.0 scale
-                // -160 dBFS is silence, 0 dBFS is max. Normalize to 0-1.0.
-                let normalizedPower = pow(10, peakPower / 20)
-                DispatchQueue.main.async {
-                    self?.audioLevel = normalizedPower // 5. @Published 변수에 음량 업데이트
-                }
+            guard let self = self else { return }
+            self.audioRecorder?.updateMeters()
+
+            if let power = self.audioRecorder?.averagePower(forChannel: 0) {
+                let normalized = pow(10, power / 20)
+                DispatchQueue.main.async { self.audioLevel = normalized }
             }
         }
     }
-    
-    // MARK: - AVAudioRecorderDelegate
+
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
-        if !flag {
-            print("Recording finished unsuccessfully.")
-        }
+        if !flag { print("Recording finished unsuccessfully.") }
+
         stopRecording()
+    }
+
+    // 업로드용 파일 URL 전달
+    func getFileURL() -> URL? {
+        return finalRecordingURL
     }
 }

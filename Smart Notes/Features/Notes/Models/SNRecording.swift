@@ -1,8 +1,9 @@
-//
-//  SNRecording.swift
-//  Smart Notes
-//
-//  Created by Wassabi K on 11/13/25.
-//
-
 import Foundation
+struct SNRecording: Identifiable, Codable {
+    var id: String = UUID().uuidString
+    var audioUrl: String
+    var transcript: String?
+    var duration: Double
+    var createdAt: Date = Date()
+    var noteId: String?
+}

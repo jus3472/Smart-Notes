@@ -1,37 +1,47 @@
-// Features/Folders/ViewModels/FoldersViewModel.swift
+// FoldersViewModel.swift
 import SwiftUI
-import CoreData
+import FirebaseAuth
+import FirebaseFirestore
 
-class FoldersViewModel: ObservableObject {
-    @Published var folders: [Folder] = []
-    private let context = PersistenceController.shared.container.viewContext
+final class FoldersViewModel: ObservableObject {
+    @Published var folders: [SNFolder] = []
+    private var listener: ListenerRegistration?
+    
+    private let service = FirebaseNoteService.shared
+    private let auth = FirebaseManager.shared.auth
     
     init() {
-        fetchFolders()
+        startListening()
     }
     
-    func fetchFolders() {
-        let request: NSFetchRequest<Folder> = Folder.fetchRequest()
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Folder.createdAt, ascending: false)]
-        
-        do {
-            folders = try context.fetch(request)
-        } catch {
-            print("Error fetching folders: \(error)")
+    deinit {
+        listener?.remove()
+    }
+    
+    private func startListening() {
+        guard let uid = auth.currentUser?.uid else { return }
+        listener = service.listenFolders(uid: uid) { [weak self] folders in
+            DispatchQueue.main.async {
+                self?.folders = folders
+            }
         }
+    }
+    
+    func refresh() {
+        listener?.remove()
+        startListening()
+    }
+    
+    func addFolder(name: String) {
+        guard let uid = auth.currentUser?.uid else { return }
+        service.addFolder(uid: uid, name: name)
     }
     
     func deleteFolder(at offsets: IndexSet) {
+        guard let uid = auth.currentUser?.uid else { return }
         for index in offsets {
             let folder = folders[index]
-            context.delete(folder)
-        }
-        
-        do {
-            try context.save()
-            fetchFolders()
-        } catch {
-            print("Error deleting folder: \(error)")
+            service.deleteFolder(uid: uid, folderId: folder.id)
         }
     }
 }

@@ -6,6 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		07BF34FC2EC307410003761F /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 07BF34FB2EC307410003761F /* FirebaseAuth */; };
+		07BF34FE2EC307410003761F /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 07BF34FD2EC307410003761F /* FirebaseCore */; };
+		07BF35002EC307410003761F /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 07BF34FF2EC307410003761F /* FirebaseDatabase */; };
+		07BF35022EC307410003761F /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 07BF35012EC307410003761F /* FirebaseFirestore */; };
+		07BF357A2EC7D2270003761F /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 07BF35792EC7D2270003761F /* FirebaseStorage */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		6BD32E0E2EB93E59002BF21A /* Smart Notes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Smart Notes.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +31,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				07BF35002EC307410003761F /* FirebaseDatabase in Frameworks */,
+				07BF35022EC307410003761F /* FirebaseFirestore in Frameworks */,
+				07BF34FE2EC307410003761F /* FirebaseCore in Frameworks */,
+				07BF357A2EC7D2270003761F /* FirebaseStorage in Frameworks */,
+				07BF34FC2EC307410003761F /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +78,11 @@
 			);
 			name = "Smart Notes";
 			packageProductDependencies = (
+				07BF34FB2EC307410003761F /* FirebaseAuth */,
+				07BF34FD2EC307410003761F /* FirebaseCore */,
+				07BF34FF2EC307410003761F /* FirebaseDatabase */,
+				07BF35012EC307410003761F /* FirebaseFirestore */,
+				07BF35792EC7D2270003761F /* FirebaseStorage */,
 			);
 			productName = "Smart Notes";
 			productReference = 6BD32E0E2EB93E59002BF21A /* Smart Notes.app */;
@@ -94,6 +112,9 @@
 			);
 			mainGroup = 6BD32E052EB93E59002BF21A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				07BF34FA2EC3030F0003761F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6BD32E0F2EB93E59002BF21A /* Products */;
 			projectDirPath = "";
@@ -253,7 +274,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 94BLP36FJZ;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Smart Notes needs microphone access to record your voice.";
@@ -283,7 +304,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 94BLP36FJZ;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Smart Notes needs microphone access to record your voice.";
@@ -328,6 +349,45 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		07BF34FA2EC3030F0003761F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		07BF34FB2EC307410003761F /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 07BF34FA2EC3030F0003761F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		07BF34FD2EC307410003761F /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 07BF34FA2EC3030F0003761F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		07BF34FF2EC307410003761F /* FirebaseDatabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 07BF34FA2EC3030F0003761F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseDatabase;
+		};
+		07BF35012EC307410003761F /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 07BF34FA2EC3030F0003761F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		07BF35792EC7D2270003761F /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 07BF34FA2EC3030F0003761F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 6BD32E062EB93E59002BF21A /* Project object */;
 }
