@@ -125,8 +125,8 @@ struct RecordingView: View {
         // MARK: Folder Picker
         .confirmationDialog("Choose Folder", isPresented: $showFolderPicker, titleVisibility: .visible) {
 
-            // Option 1: All Notes (no folder)
-            Button("All Notes") {
+            // Option 1: Notes
+            Button("Notes") {
                 saveNote(in: nil)
             }
 
@@ -160,7 +160,7 @@ struct RecordingView: View {
                     folderId: folder?.id       // store selected folder
                 )
 
-                let locationName = folder?.name ?? "All Notes"
+                let locationName = folder?.name ?? "Notes"
                 saveMessage = "Your '\(trimmedTitle)' note has been saved in \"\(locationName)\"."
                 showSaveAlert = true
 

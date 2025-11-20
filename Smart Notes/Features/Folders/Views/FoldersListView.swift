@@ -9,12 +9,12 @@ struct FoldersListView: View {
     var body: some View {
         NavigationStack {
             List {
-                // 🔹 All Notes Section
+                // 🔹 Notes Section
                 Section {
                     NavigationLink {
                         FolderDetailView(folder: nil)
                     } label: {
-                        Label("All Notes", systemImage: "tray.full")
+                        Label("Notes", systemImage: "tray.full")
                     }
                 }
                 

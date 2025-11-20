@@ -14,7 +14,7 @@ struct FolderDetailView: View {
                 }
             }
         }
-        .navigationTitle(folder?.name ?? "All Notes")
+        .navigationTitle(folder?.name ?? "Notes")
         .navigationBarTitleDisplayMode(.large)
     }
 }
