@@ -1,43 +1,46 @@
-// AuthView.swift
 import SwiftUI
+
+enum AuthStep {
+    case welcome
+    case login
+    case signup
+}
 
 struct AuthView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
-    @State private var isSignUpMode = false
-    
+    @State private var step: AuthStep = .welcome
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section(header: Text("Account")) {
-                    TextField("Email", text: $authViewModel.email)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
-                    SecureField("Password", text: $authViewModel.password)
-                }
-                
-                if let error = authViewModel.errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                }
-                
-                Section {
-                    Button(isSignUpMode ? "Sign Up" : "Sign In") {
-                        if isSignUpMode {
-                            authViewModel.signUp()
-                        } else {
-                            authViewModel.signIn()
-                        }
-                    }
-                }
+            content
+                .animation(.easeInOut, value: step)
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch step {
+        case .welcome:
+            WelcomeScreen {
+                step = .login
             }
-            .navigationTitle(isSignUpMode ? "Create Account" : "Sign In")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(isSignUpMode ? "Have an account?" : "New user?") {
-                        isSignUpMode.toggle()
-                    }
-                }
+
+        case .login:
+            LoginScreen {
+                step = .signup
+            }
+
+        case .signup:
+            SignUpScreen {
+                step = .login
             }
         }
+    }
+}
+
+struct AuthView_Previews: PreviewProvider {
+    static var previews: some View {
+        AuthView()
+            .environmentObject(AuthViewModel())
     }
 }
