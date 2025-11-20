@@ -1,22 +1,20 @@
-// FolderDetailView.swift
 import SwiftUI
 
 struct FolderDetailView: View {
+    let folder: SNFolder?
     @EnvironmentObject var notesViewModel: NotesViewModel
     
-    let folder: SNFolder?   // nil이면 All Notes
-    
     var body: some View {
-        let notes = notesViewModel.notes(in: folder)
-        
         List {
-            ForEach(notes) { note in
-                NoteRowView(note: note)
-            }
-            .onDelete { offsets in
-                notesViewModel.delete(at: offsets, in: folder)
+            ForEach(notesViewModel.notes(in: folder)) { note in
+                NavigationLink {
+                    DetailNoteView(note: note)   // 🔥 상세 화면으로 이동
+                } label: {
+                    NoteRowView(note: note)     // 기존 리스트 UI 그대로 사용
+                }
             }
         }
         .navigationTitle(folder?.name ?? "All Notes")
+        .navigationBarTitleDisplayMode(.large)
     }
 }

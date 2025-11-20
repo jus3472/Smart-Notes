@@ -9,27 +9,36 @@ struct FoldersListView: View {
     var body: some View {
         NavigationStack {
             List {
+                // 🔹 All Notes Section
                 Section {
-                    NavigationLink(destination: FolderDetailView(folder: nil)) {
+                    NavigationLink {
+                        FolderDetailView(folder: nil)
+                    } label: {
                         Label("All Notes", systemImage: "tray.full")
                     }
                 }
                 
+                // 🔹 User-created Folders Section
                 Section("Folders") {
                     ForEach(foldersViewModel.folders) { folder in
-                        NavigationLink(destination: FolderDetailView(folder: folder)) {
+                        NavigationLink {
+                            FolderDetailView(folder: folder)
+                        } label: {
                             Text(folder.name)
                         }
                     }
-                    .onDelete(perform: foldersViewModel.deleteFolder)
+                    .onDelete { indexSet in
+                        foldersViewModel.deleteFolder(at: indexSet)
+                    }
                 }
             }
             .navigationTitle("Folders")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
+                    Button {
                         showingAddFolder = true
-                    }) {
+                    } label: {
                         Image(systemName: "folder.badge.plus")
                     }
                 }
