@@ -32,7 +32,23 @@ class GeminiService {
             "contents": [
                 [
                     "parts": [
-                        ["text": "Summarize concisely:\n\n\(text)"]
+                        ["text":
+                        """
+                        You are SmartNotes, an intelligent academic note assistant.
+                        Summarize the following content clearly and structurally.
+                        Requirements:
+
+                        - Extract the **core ideas only**, removing filler words.
+                        - Organize into sections with clear bullet points.
+                        - Combine related ideas into unified points.
+                        - Highlight definitions, processes, and key insights.
+                        - Keep it concise but not overly shortened.
+                        - Avoid adding new information.
+
+                        Content to summarize:
+                        \(text)
+                        """
+                        ]
                     ]
                 ]
             ]
