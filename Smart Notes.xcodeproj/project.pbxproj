@@ -148,6 +148,8 @@
 /* Begin XCBuildConfiguration section */
 		6BD32E172EB93E5B002BF21A /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6BD32E102EB93E59002BF21A /* Smart Notes */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -212,6 +214,8 @@
 		};
 		6BD32E182EB93E5B002BF21A /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6BD32E102EB93E59002BF21A /* Smart Notes */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -269,6 +273,8 @@
 		};
 		6BD32E1A2EB93E5B002BF21A /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6BD32E102EB93E59002BF21A /* Smart Notes */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -277,6 +283,8 @@
 				DEVELOPMENT_TEAM = 94BLP36FJZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Smart-Notes-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Smart Notes needs microphone access to record your voice.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Smart Notes uses speech recognition to transcribe your voice into text.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -299,6 +307,8 @@
 		};
 		6BD32E1B2EB93E5B002BF21A /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6BD32E102EB93E59002BF21A /* Smart Notes */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -307,6 +317,8 @@
 				DEVELOPMENT_TEAM = 94BLP36FJZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Smart-Notes-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Smart Notes needs microphone access to record your voice.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Smart Notes uses speech recognition to transcribe your voice into text.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

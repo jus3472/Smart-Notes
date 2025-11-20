@@ -13,6 +13,7 @@ struct RecordingView: View {
     
     @State private var showingSaveDialog = false
     
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
@@ -43,13 +44,22 @@ struct RecordingView: View {
                     
                     // 🎤 녹음/일시정지/재생 버튼
                     Button(action: {
-                        viewModel.handleMainButtonTap()
+                        if viewModel.recordingState == .idle {
+                            viewModel.startRecording()
+                        } else if viewModel.recordingState == .recording {
+                            viewModel.stopRecording()
+                        }
                     }) {
-                        Image(systemName: mainButtonIcon)
-                            .resizable()
-                            .frame(width: 70, height: 70)
-                            .foregroundColor(mainButtonColor)
+                        Image(systemName:
+                            viewModel.recordingState == .idle
+                            ? "record.circle"
+                            : "stop.circle.fill"
+                        )
+                        .resizable()
+                        .frame(width: 70, height: 70)
+                        .foregroundColor(viewModel.recordingState == .idle ? .red : .gray)
                     }
+
                     
                     // 💾 저장 버튼 → Firebase 업로드 → SaveNoteView 열기
                     Button(action: uploadAndOpenSaveView) {
@@ -59,6 +69,7 @@ struct RecordingView: View {
                             .foregroundColor(.green)
                     }
                     .disabled(viewModel.recordingState != .paused)
+
                     
                     Spacer()
                 }

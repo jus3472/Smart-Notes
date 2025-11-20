@@ -11,29 +11,37 @@ enum RecordingState {
     case recording
     case paused
 }
-
 class RecordingViewModel: ObservableObject {
     @Published var recordingState: RecordingState = .idle
-    @Published var transcribedText = ""
-    @Published var recordingTime = "00:00"
+    @Published var transcribedText: String = ""
+    @Published var recordingTime: String = "00:00"
     @Published var currentAudioLevel: Float = 0.0
+    @Published var aiSummary: String = ""
     
-    private let speechService = SpeechRecognizerService()
-    private let audioRecorder = AudioRecorderService()
-    
+    private let liveService = LiveSpeechRecorderService()
     private var timer: Timer?
     private var seconds = 0
     private var cancellables = Set<AnyCancellable>()
     
     init() {
-        audioRecorder.$audioLevel
+        // 서비스의 값들을 뷰모델로 전달
+        liveService.$transcribedText
+            .receive(on: RunLoop.main)
+            .assign(to: \.transcribedText, on: self)
+            .store(in: &cancellables)
+        
+        liveService.$audioLevel
+            .receive(on: RunLoop.main)
             .assign(to: \.currentAudioLevel, on: self)
             .store(in: &cancellables)
+        
+        print("🔑 Gemini API Key:", Secrets.geminiAPIKey)
+
     }
     
-    // 🔥 Firebase 업로드를 위해 파일 URL 리턴
+    // Firebase 업로드용 파일 URL
     func getRecordingFileURL() -> URL? {
-        return audioRecorder.getFileURL()
+        return liveService.finalRecordingURL
     }
     
     func handleMainButtonTap() {
@@ -41,45 +49,31 @@ class RecordingViewModel: ObservableObject {
         case .idle:
             startRecording()
         case .recording:
-            pauseRecording()
+            stopRecording()
         case .paused:
-            resumeRecording()
+            // 이 구조에서는 일단 pause/resume 없이 가도 됨
+            break
         }
     }
     
-    private func startRecording() {
-        speechService.requestAuthorization()
-        speechService.startTranscribing()
-        audioRecorder.startRecording()
+    func startRecording() {
+        liveService.requestAuthorization()
+        liveService.start()
         startTimer()
         recordingState = .recording
     }
     
-    private func pauseRecording() {
-        speechService.stopTranscribing()
-        audioRecorder.pauseRecording()
-        pauseTimer()
-        recordingState = .paused
-    }
-    
-    private func resumeRecording() {
-        speechService.startTranscribing()
-        audioRecorder.resumeRecording()
-        resumeTimer()
-        recordingState = .recording
+    func stopRecording() {
+        liveService.stop()
+        stopTimer()
+        recordingState = .idle
     }
     
     func resetRecording() {
-        speechService.stopTranscribing()
-        audioRecorder.stopRecording()
-        
-        timer?.invalidate()
-        timer = nil
-        
+        stopRecording()
         seconds = 0
         recordingTime = "00:00"
         transcribedText = ""
-        recordingState = .idle
         currentAudioLevel = 0.0
     }
     
@@ -92,16 +86,9 @@ class RecordingViewModel: ObservableObject {
         }
     }
     
-    private func pauseTimer() {
+    private func stopTimer() {
         timer?.invalidate()
         timer = nil
-    }
-    
-    private func resumeTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            self.seconds += 1
-            self.updateTimerDisplay()
-        }
     }
     
     private func updateTimerDisplay() {
@@ -110,12 +97,10 @@ class RecordingViewModel: ObservableObject {
         recordingTime = String(format: "%02d:%02d", minutes, seconds)
     }
     
-    @Published var aiSummary: String = ""
-
+    // MARK: - AI Summary (그대로 사용 가능)
     func generateAISummary() {
         Task {
             let gemini = GeminiService()
-
             do {
                 let summary = try await gemini.summarize(self.transcribedText)
                 await MainActor.run {
@@ -128,6 +113,4 @@ class RecordingViewModel: ObservableObject {
             }
         }
     }
-
-
 }
