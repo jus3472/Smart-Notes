@@ -107,7 +107,7 @@ class RecordingViewModel: ObservableObject {
 
     // MARK: - Save Summary
     @MainActor
-    func generateSummaryAndSave(title: String) async throws {
+    func generateSummaryAndSave(title: String, folderId: String?) async throws {
         guard let uid = Auth.auth().currentUser?.uid else { return }
 
         isProcessing = true
@@ -125,7 +125,8 @@ class RecordingViewModel: ObservableObject {
         FirebaseNoteService.shared.addNote(
             uid: uid,
             title: title,
-            content: fullContent
+            content: fullContent,
+            folderId: folderId   // store in chosen folder
         )
     }
 }

@@ -1,18 +1,18 @@
-//
-//  RecordingView.swift
-//
-
+// RecordingView.swift
 import SwiftUI
 import FirebaseAuth
 
 struct RecordingView: View {
     @StateObject private var viewModel = RecordingViewModel()
+    @StateObject private var foldersViewModel = FoldersViewModel()   // load folders
 
     @State private var showTitlePrompt = false
     @State private var noteTitleInput = ""
 
     @State private var showSaveAlert = false
     @State private var saveMessage = ""
+
+    @State private var showFolderPicker = false   // new: show folder chooser
 
     var body: some View {
         NavigationView {
@@ -78,7 +78,7 @@ struct RecordingView: View {
                     // SAVE BUTTON
                     Button {
                         viewModel.stopRecording()
-                        showTitlePrompt = true
+                        showTitlePrompt = true      // first ask for title
                     } label: {
                         Image(systemName: "checkmark.circle.fill")
                             .resizable()
@@ -113,7 +113,30 @@ struct RecordingView: View {
         // MARK: Title Input
         .alert("Enter Note Title", isPresented: $showTitlePrompt) {
             TextField("Note title", text: $noteTitleInput)
-            Button("Save") { saveNote() }
+            Button("Next") {
+                // after title, show folder picker
+                if !noteTitleInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    showFolderPicker = true
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+
+        // MARK: Folder Picker
+        .confirmationDialog("Choose Folder", isPresented: $showFolderPicker, titleVisibility: .visible) {
+
+            // Option 1: All Notes (no folder)
+            Button("All Notes") {
+                saveNote(in: nil)
+            }
+
+            // Option 2: each Firestore folder
+            ForEach(foldersViewModel.folders) { folder in
+                Button(folder.name) {
+                    saveNote(in: folder)
+                }
+            }
+
             Button("Cancel", role: .cancel) {}
         }
 
@@ -125,15 +148,24 @@ struct RecordingView: View {
         }
     }
 
-    // MARK: Save Logic
-    func saveNote() {
-        guard !noteTitleInput.isEmpty else { return }
+    // MARK: Save Logic with folder
+    func saveNote(in folder: SNFolder?) {
+        let trimmedTitle = noteTitleInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else { return }
 
         Task {
             do {
-                try await viewModel.generateSummaryAndSave(title: noteTitleInput)
-                saveMessage = "Your '\(noteTitleInput)' note has been saved."
+                try await viewModel.generateSummaryAndSave(
+                    title: trimmedTitle,
+                    folderId: folder?.id       // store selected folder
+                )
+
+                let locationName = folder?.name ?? "All Notes"
+                saveMessage = "Your '\(trimmedTitle)' note has been saved in \"\(locationName)\"."
                 showSaveAlert = true
+
+                // reset title for next time
+                noteTitleInput = ""
             } catch {
                 saveMessage = "Failed to save note."
                 showSaveAlert = true
