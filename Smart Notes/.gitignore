@@ -1,0 +1,19 @@
+# Swift / Xcode
+DerivedData/
+build/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Firebase keys
+GoogleService-Info.plist
+
+# Environment files / secrets
+*.env
+Secrets.swift
+
+# API keys or config
+Config.swift
+Secrets.xcconfig
+
+# Misc
+.DS_Store

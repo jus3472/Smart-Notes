@@ -63,6 +63,22 @@ struct RecordingView: View {
                     Spacer()
                 }
                 .padding()
+                
+                Button("Generate Summary") {
+                    viewModel.generateAISummary()
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.top, 10)
+
+                // ✅ AI 요약 결과 표시
+                if !viewModel.aiSummary.isEmpty {
+                    Text(viewModel.aiSummary)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.yellow.opacity(0.15))
+                        .cornerRadius(8)
+                        .padding(.horizontal)
+                }
             }
             .navigationTitle("Recording")
             .sheet(isPresented: $showingSaveDialog) {

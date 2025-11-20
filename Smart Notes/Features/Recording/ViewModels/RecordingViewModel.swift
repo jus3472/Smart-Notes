@@ -109,4 +109,25 @@ class RecordingViewModel: ObservableObject {
         let seconds = seconds % 60
         recordingTime = String(format: "%02d:%02d", minutes, seconds)
     }
+    
+    @Published var aiSummary: String = ""
+
+    func generateAISummary() {
+        Task {
+            let gemini = GeminiService()
+
+            do {
+                let summary = try await gemini.summarize(self.transcribedText)
+                await MainActor.run {
+                    self.aiSummary = summary
+                }
+            } catch {
+                await MainActor.run {
+                    self.aiSummary = "⚠️ Summary failed: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+
 }
