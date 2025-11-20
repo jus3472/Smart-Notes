@@ -35,10 +35,8 @@ final class FirebaseNoteService {
         foldersCollection(uid: uid)
             .order(by: "createdAt", descending: false)
             .addSnapshotListener { snapshot, _ in
-                let folders: [SNFolder] = snapshot?.documents.compactMap { doc in
-                    var data = doc.data()
-                    data["id"] = doc.documentID
-                    return try? FirestoreDecoder.decode(SNFolder.self, from: data)
+                let folders = snapshot?.documents.compactMap { doc in
+                    try? doc.data(as: SNFolder.self)
                 } ?? []
                 handler(folders)
             }
@@ -46,10 +44,18 @@ final class FirebaseNoteService {
     
     func addFolder(uid: String, name: String, completion: ((Error?) -> Void)? = nil) {
         let id = UUID().uuidString
-        let folder = SNFolder(id: id, name: name, createdAt: Date(), updatedAt: Date())
+        let folder = SNFolder(
+            id: id,
+            name: name,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+
         do {
-            let data = try FirestoreEncoder.encode(folder)
-            foldersCollection(uid: uid).document(id).setData(data, completion: completion)
+            try foldersCollection(uid: uid)
+                .document(id)
+                .setData(from: folder)
+            completion?(nil)
         } catch {
             completion?(error)
         }
@@ -67,10 +73,8 @@ final class FirebaseNoteService {
         notesCollection(uid: uid)
             .order(by: "updatedAt", descending: true)
             .addSnapshotListener { snapshot, _ in
-                let notes: [SNNote] = snapshot?.documents.compactMap { doc in
-                    var data = doc.data()
-                    data["id"] = doc.documentID
-                    return try? FirestoreDecoder.decode(SNNote.self, from: data)
+                let notes = snapshot?.documents.compactMap { doc in
+                    try? doc.data(as: SNNote.self)
                 } ?? []
                 handler(notes)
             }
@@ -94,10 +98,10 @@ final class FirebaseNoteService {
             createdAt: Date(),
             updatedAt: Date()
         )
-        
+
         do {
-            let data = try FirestoreEncoder.encode(note)
-            notesCollection(uid: uid).document(id).setData(data, completion: completion)
+            try notesCollection(uid: uid).document(id).setData(from: note)
+            completion?(nil)
         } catch {
             completion?(error)
         }

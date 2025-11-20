@@ -1,4 +1,6 @@
-// LiveSpeechRecorderService.swift
+//
+//  LiveSpeechRecorderService.swift
+//
 
 import Foundation
 import AVFoundation
@@ -6,182 +8,216 @@ import Speech
 import Combine
 
 class LiveSpeechRecorderService: NSObject, ObservableObject {
-    // MARK: - Published properties
+
+    // MARK: - Published
     @Published var transcribedText: String = ""
     @Published var isRecording: Bool = false
-    @Published var audioLevel: Float = 0.0  // 0.0 ~ 1.0 (waveform 용)
-    
-    // 최종 녹음 파일 URL (Firebase 업로드용)
-    private(set) var finalRecordingURL: URL?
-    
-    // MARK: - Private properties
+    @Published var audioLevel: Float = 0.0
+
+    // MARK: - Private
     private let audioEngine = AVAudioEngine()
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-    
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-    
-    private var audioFile: AVAudioFile?   // 실시간 파일 쓰기용
+
+    private var audioFile: AVAudioFile?
     private let session = AVAudioSession.sharedInstance()
+
+    private(set) var finalRecordingURL: URL?
     
+    private var isPaused = false
+    private var isResuming = false
+
+    private var accumulatedText: String = ""  // 전체 누적 STT
+
     // MARK: - Authorization
     func requestAuthorization() {
         SFSpeechRecognizer.requestAuthorization { status in
-            DispatchQueue.main.async {
-                switch status {
-                case .authorized:
-                    print("✅ Speech recognition authorized")
-                default:
-                    print("❌ Speech recognition not authorized: \(status)")
-                }
-            }
+            print("Speech Authorization:", status.rawValue)
         }
     }
-    
-    // MARK: - Start Recording + Live STT
-    func start() {
-        if isRecording { return }
-        isRecording = true
-        transcribedText = ""
-        audioLevel = 0.0
-        finalRecordingURL = nil
-        
-        // 1) Audio Session 설정
-        do {
-            try session.setCategory(.playAndRecord,
-                                    mode: .default,
-                                    options: [.duckOthers])
 
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
-        } catch {
-            print("❌ Audio session setup failed: \(error.localizedDescription)")
+    // MARK: - START
+    func start() {
+        print("🎙 START")
+        isRecording = true
+        isPaused = false
+        isResuming = false
+
+        accumulatedText = ""
+        transcribedText = ""
+
+        setupAudioSession()
+        setupRecognitionRequest()
+        setupAudioFile()
+        setupAudioTap()
+
+        startAudioEngine()
+        startRecognitionTask()
+    }
+
+    // MARK: - PAUSE
+    func pause() {
+        print("⏸ PAUSE")
+        isPaused = true  // STT 업데이트 무시
+
+        audioEngine.pause()
+        recognitionRequest?.endAudio()
+        recognitionTask = nil
+        recognitionRequest = nil
+
+        DispatchQueue.main.async {
+            self.transcribedText = self.accumulatedText
         }
-        
-        // 2) Speech Recognition Request 생성
-        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        recognitionRequest?.shouldReportPartialResults = true
-        
-        // 3) 저장할 파일 URL 생성
-        let filename = UUID().uuidString + ".m4a"
-        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(filename)
-        
-        // 4) AVAudioEngine input tap 설정
+
+        isRecording = false
+        isResuming = false
+    }
+
+    // MARK: - RESUME
+    func resume() {
+        print("▶️ RESUME")
+
+        guard !isRecording else { return }
+        isRecording = true
+        isPaused = false
+        isResuming = true  // append mode
+
+        setupRecognitionRequest()
+        startRecognitionTask()
+
         let inputNode = audioEngine.inputNode
-        inputNode.removeTap(onBus: 0)
-        
         let format = inputNode.outputFormat(forBus: 0)
-        
-        do {
-            // AVAudioFile 생성 (실시간으로 buffer를 써 넣음)
-            audioFile = try AVAudioFile(forWriting: url,
-                                        settings: format.settings)
-            print("🎧 Will record to file:", url)
-        } catch {
-            print("❌ Failed to create AVAudioFile:", error.localizedDescription)
-        }
-        
+
+        inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0,
                              bufferSize: 1024,
                              format: format) { [weak self] buffer, _ in
             guard let self = self else { return }
-            
-            // ① STT용으로 buffer append
             self.recognitionRequest?.append(buffer)
-            
-            // ② 파일로 쓰기
-            if let file = self.audioFile {
-                do {
-                    try file.write(from: buffer)
-                } catch {
-                    print("❌ Failed to write buffer to file:", error.localizedDescription)
-                }
-            }
-            
-            // ③ audioLevel 계산 (waveform)
+            try? self.audioFile?.write(from: buffer)
             self.updateAudioLevel(from: buffer)
         }
-        
-        // 5) AudioEngine 시작
-        audioEngine.prepare()
-        do {
-            try audioEngine.start()
-            print("✅ Audio engine started")
-        } catch {
-            print("❌ Audio engine couldn't start:", error.localizedDescription)
-        }
-        
-        // 6) Speech Recognition Task 시작
-        guard let recognizer = speechRecognizer, let request = recognitionRequest else {
-            print("❌ Speech recognizer or request is nil")
-            return
-        }
-        
-        recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard let self = self else { return }
-            
-            if let result = result {
-                DispatchQueue.main.async {
-                    self.transcribedText = result.bestTranscription.formattedString
-                }
-            }
-            
-            if let error = error {
-                print("❌ Recognition error:", error.localizedDescription)
-                self.stop()
-            } else if result?.isFinal == true {
-                self.stop()
-            }
-        }
+
+        startAudioEngine()
     }
-    
-    // MARK: - Stop Recording + STT
+
+    // MARK: - STOP
     func stop() {
-        if !isRecording { return }
+        print("🛑 STOP")
+        isPaused = false
+        isResuming = false
         isRecording = false
-        
-        // tap 제거
-        let inputNode = audioEngine.inputNode
-        inputNode.removeTap(onBus: 0)
-        
-        // 오디오 엔진 종료
+
+        audioEngine.inputNode.removeTap(onBus: 0)
         audioEngine.stop()
         audioEngine.reset()
-        
-        // STT 정상 종료
+
         recognitionRequest?.endAudio()
         recognitionTask = nil
         recognitionRequest = nil
-        
-        // 파일 URL 저장
+
         if let file = audioFile {
             finalRecordingURL = file.url
-            print("✅ Final recording file URL:", file.url)
         }
         audioFile = nil
-        
-        // 세션 비활성화
+
         try? session.setActive(false)
     }
 
-    
-    // MARK: - Audio Level 계산
+    // MARK: - Audio Session
+    private func setupAudioSession() {
+        try? session.setCategory(.playAndRecord, mode: .default,
+                                 options: [.duckOthers, .allowBluetooth, .defaultToSpeaker])
+        try? session.setActive(true)
+    }
+
+    // MARK: - Recognition Request
+    private func setupRecognitionRequest() {
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        recognitionRequest?.shouldReportPartialResults = true
+    }
+
+    // MARK: - Recognition Task
+    private func startRecognitionTask() {
+        guard let recognizer = speechRecognizer,
+              let request = recognitionRequest else { return }
+
+        recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+            guard let self = self else { return }
+
+            if let result = result {
+                let newText = result.bestTranscription.formattedString
+
+                DispatchQueue.main.async {
+
+                    // 🔥 pause 상태에서는 STT 업데이트 무시
+                    if self.isPaused { return }
+
+                    if self.isResuming {
+                        self.transcribedText = self.accumulatedText + " " + newText
+                    } else {
+                        self.transcribedText = newText
+                    }
+                }
+            }
+
+            // final or error
+            if error != nil || result?.isFinal == true {
+                self.accumulatedText = self.transcribedText
+                self.isResuming = false
+            }
+        }
+    }
+
+    // MARK: - Audio File
+    private func setupAudioFile() {
+        let filename = UUID().uuidString + ".m4a"
+        let url = FileManager.default.urls(for: .documentDirectory,
+                                           in: .userDomainMask)[0]
+            .appendingPathComponent(filename)
+
+        let inputNode = audioEngine.inputNode
+        let format = inputNode.outputFormat(forBus: 0)
+
+        audioFile = try? AVAudioFile(forWriting: url, settings: format.settings)
+    }
+
+    // MARK: - Tap
+    private func setupAudioTap() {
+        let inputNode = audioEngine.inputNode
+        inputNode.removeTap(onBus: 0)
+
+        let format = inputNode.outputFormat(forBus: 0)
+
+        inputNode.installTap(onBus: 0,
+                             bufferSize: 1024,
+                             format: format) { [weak self] buffer, _ in
+            guard let self = self else { return }
+            self.recognitionRequest?.append(buffer)
+            try? self.audioFile?.write(from: buffer)
+            self.updateAudioLevel(from: buffer)
+        }
+    }
+
+    // MARK: Engine Start
+    private func startAudioEngine() {
+        try? audioEngine.start()
+    }
+
+    // MARK: Audio Level (RMS)
     private func updateAudioLevel(from buffer: AVAudioPCMBuffer) {
         guard let channelData = buffer.floatChannelData?[0] else { return }
+
         let frameLength = Int(buffer.frameLength)
         if frameLength == 0 { return }
-        
-        // 간단한 RMS 계산
-        var sum: Float = 0.0
-        for i in 0..<frameLength {
-            let sample = channelData[i]
-            sum += sample * sample
-        }
-        let rms = sqrt(sum / Float(frameLength))  // 0 ~ 1 근처
-        
-        // 적당히 스케일링해서 0~1 클램핑
-        let level = min(max(rms * 5, 0.0), 1.0)  // multiplier는 UI 보면서 조절
-        
+
+        var sum: Float = 0
+        for i in 0..<frameLength { sum += channelData[i] * channelData[i] }
+
+        let rms = sqrt(sum / Float(frameLength))
+        let level = min(max(rms * 5, 0.0), 1.0)
+
         DispatchQueue.main.async {
             self.audioLevel = level
         }

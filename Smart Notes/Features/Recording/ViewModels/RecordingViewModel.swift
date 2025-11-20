@@ -9,25 +9,42 @@ import FirebaseAuth
 enum RecordingState {
     case idle
     case recording
+    case paused
 }
 
 class RecordingViewModel: ObservableObject {
+
+    // MARK: - Published States
     @Published var recordingState: RecordingState = .idle
     @Published var transcribedText: String = ""
     @Published var recordingTime: String = "00:00"
     @Published var currentAudioLevel: Float = 0.0
     @Published var aiSummary: String = ""
+    @Published var isProcessing = false
 
+    // MARK: - Internal States
     private let liveService = LiveSpeechRecorderService()
+
     private var timer: Timer?
     private var seconds = 0
     private var cancellables = Set<AnyCancellable>()
 
+    @Published var isPaused: Bool = false   // ⭐ 추가: UI 업데이트 제어용
+
     init() {
-        // Live service → ViewModel data binding
+
+        // MARK: STT Binding (pause-safe)
         liveService.$transcribedText
             .receive(on: RunLoop.main)
-            .assign(to: \.transcribedText, on: self)
+            .sink { [weak self] newValue in
+                guard let self = self else { return }
+
+                // ⭐ Pause 상태일 때는 UI 업데이트 무시
+                if self.isPaused { return }
+
+                // Resume 중에는 LiveService가 append하여 push
+                self.transcribedText = newValue
+            }
             .store(in: &cancellables)
 
         liveService.$audioLevel
@@ -36,34 +53,44 @@ class RecordingViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    // MARK: - Recording Controls
+    // MARK: - Recording Control
     func startRecording() {
+        isPaused = false
         liveService.requestAuthorization()
         liveService.start()
-        startTimer()
+        startTimer(reset: true)
+        recordingState = .recording
+    }
+
+    func pauseRecording() {
+        isPaused = true         // ⭐ pause 상태
+        liveService.pause()
+        stopTimer()
+        recordingState = .paused
+    }
+
+    func resumeRecording() {
+        isPaused = false
+        liveService.resume()
+        startTimer(reset: false)
         recordingState = .recording
     }
 
     func stopRecording() {
+        isPaused = false
         liveService.stop()
         stopTimer()
+        recordingTime = "00:00"
         recordingState = .idle
     }
 
-    func resetRecording() {
-        stopRecording()
-        seconds = 0
-        recordingTime = "00:00"
-        transcribedText = ""
-        currentAudioLevel = 0.0
-    }
-
     // MARK: - Timer
-    private func startTimer() {
-        seconds = 0
+    private func startTimer(reset: Bool = true) {
+        if reset { seconds = 0 }
+        timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             self.seconds += 1
-            self.updateTimerDisplay()
+            self.updateTimer()
         }
     }
 
@@ -72,40 +99,33 @@ class RecordingViewModel: ObservableObject {
         timer = nil
     }
 
-    private func updateTimerDisplay() {
-        let minutes = seconds / 60
-        let seconds = seconds % 60
-        recordingTime = String(format: "%02d:%02d", minutes, seconds)
+    private func updateTimer() {
+        let m = seconds / 60
+        let s = seconds % 60
+        recordingTime = String(format: "%02d:%02d", m, s)
     }
 
+    // MARK: - Save Summary
     @MainActor
-    func saveSummaryNote() async {
+    func generateSummaryAndSave(title: String) async throws {
         guard let uid = Auth.auth().currentUser?.uid else { return }
 
-        // 1) AI Summary 생성
-        let gemini = GeminiService()
-        let summary = (try? await gemini.summarize(self.transcribedText))
-                    ?? "Summary unavailable"
+        isProcessing = true
+        defer { isProcessing = false }
 
-        // 2) Firestore 저장
+        let gemini = GeminiService()
+        let summary = try await gemini.summarize(self.transcribedText)
+        self.aiSummary = summary
+
         let fullContent = """
         📌 Summary:
         \(summary)
         """
 
-
         FirebaseNoteService.shared.addNote(
             uid: uid,
-            title: "New Note",
-            content: fullContent,
-            folderId: nil,
-            audioUrl: nil
+            title: title,
+            content: fullContent
         )
-
-        // 3) 녹음 리셋
-        self.resetRecording()
-
-        print("✅ Note saved with summary!")
     }
-
 }
