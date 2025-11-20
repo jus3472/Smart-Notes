@@ -3,6 +3,8 @@ import SwiftUI
 
 struct AddFolderView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var foldersViewModel: FoldersViewModel   // use Firebase view model
+    
     @State private var folderName = ""
     @State private var selectedColor = "blue"
     
@@ -30,24 +32,21 @@ struct AddFolderView: View {
                     Button("Save") {
                         saveFolder()
                     }
+                    // optional: avoid empty folders
+                    .disabled(folderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }
     }
     
-    func saveFolder() {
-        let context = PersistenceController.shared.container.viewContext
-        let newFolder = Folder(context: context)
-        newFolder.id = UUID()
-        newFolder.name = folderName
-        newFolder.color = selectedColor
-        newFolder.createdAt = Date()
+    private func saveFolder() {
+        let trimmedName = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
         
-        do {
-            try context.save()
-            dismiss()
-        } catch {
-            print("Error saving folder: \(error)")
-        }
+        // Create folder in Firestore via the view model
+        foldersViewModel.addFolder(name: trimmedName)
+        // (color is currently not persisted anywhere; see note below)
+        
+        dismiss()
     }
 }

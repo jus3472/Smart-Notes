@@ -18,15 +18,10 @@ struct MainAppView: View {
                     Label("Record", systemImage: "mic.fill")
                 }
 
-            VStack {
-                Text("Settings")
-                Button("Sign Out") {
-                    authViewModel.signOut()
+            SettingsView()
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
                 }
-            }
-            .tabItem {
-                Label("Settings", systemImage: "gearshape")
-            }
         }
     }
 }

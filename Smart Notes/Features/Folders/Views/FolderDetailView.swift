@@ -1,22 +1,24 @@
-// FolderDetailView.swift
 import SwiftUI
 
 struct FolderDetailView: View {
+    let folder: SNFolder?
     @EnvironmentObject var notesViewModel: NotesViewModel
     
-    let folder: SNFolder?   // nil이면 All Notes
-    
     var body: some View {
-        let notes = notesViewModel.notes(in: folder)
-        
         List {
-            ForEach(notes) { note in
-                NoteRowView(note: note)
+            ForEach(notesViewModel.notes(in: folder)) { note in
+                NavigationLink {
+                    DetailNoteView(note: note)   // 상세 화면
+                } label: {
+                    NoteRowView(note: note)     // 리스트 UI
+                }
             }
-            .onDelete { offsets in
-                notesViewModel.delete(at: offsets, in: folder)
+            .onDelete { indexSet in
+                // Delete from Firestore via NotesViewModel
+                notesViewModel.delete(at: indexSet, in: folder)
             }
         }
-        .navigationTitle(folder?.name ?? "All Notes")
+        .navigationTitle(folder?.name ?? "Notes")
+        .navigationBarTitleDisplayMode(.large)
     }
 }

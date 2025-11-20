@@ -35,28 +35,44 @@ final class FirebaseNoteService {
         foldersCollection(uid: uid)
             .order(by: "createdAt", descending: false)
             .addSnapshotListener { snapshot, _ in
-                let folders: [SNFolder] = snapshot?.documents.compactMap { doc in
-                    var data = doc.data()
-                    data["id"] = doc.documentID
-                    return try? FirestoreDecoder.decode(SNFolder.self, from: data)
+                let folders = snapshot?.documents.compactMap { doc in
+                    try? doc.data(as: SNFolder.self)
                 } ?? []
                 handler(folders)
             }
     }
     
-    func addFolder(uid: String, name: String, completion: ((Error?) -> Void)? = nil) {
+    func addFolder(
+        uid: String,
+        name: String,
+        completion: ((Error?) -> Void)? = nil
+    ) {
         let id = UUID().uuidString
-        let folder = SNFolder(id: id, name: name, createdAt: Date(), updatedAt: Date())
+        let folder = SNFolder(
+            id: id,
+            name: name,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+
         do {
-            let data = try FirestoreEncoder.encode(folder)
-            foldersCollection(uid: uid).document(id).setData(data, completion: completion)
+            try foldersCollection(uid: uid)
+                .document(id)
+                .setData(from: folder)
+            completion?(nil)
         } catch {
             completion?(error)
         }
     }
     
-    func deleteFolder(uid: String, folderId: String, completion: ((Error?) -> Void)? = nil) {
-        foldersCollection(uid: uid).document(folderId).delete(completion: completion)
+    func deleteFolder(
+        uid: String,
+        folderId: String,
+        completion: ((Error?) -> Void)? = nil
+    ) {
+        foldersCollection(uid: uid)
+            .document(folderId)
+            .delete(completion: completion)
     }
     
     // MARK: - Notes
@@ -67,10 +83,8 @@ final class FirebaseNoteService {
         notesCollection(uid: uid)
             .order(by: "updatedAt", descending: true)
             .addSnapshotListener { snapshot, _ in
-                let notes: [SNNote] = snapshot?.documents.compactMap { doc in
-                    var data = doc.data()
-                    data["id"] = doc.documentID
-                    return try? FirestoreDecoder.decode(SNNote.self, from: data)
+                let notes = snapshot?.documents.compactMap { doc in
+                    try? doc.data(as: SNNote.self)
                 } ?? []
                 handler(notes)
             }
@@ -94,17 +108,58 @@ final class FirebaseNoteService {
             createdAt: Date(),
             updatedAt: Date()
         )
-        
+
         do {
-            let data = try FirestoreEncoder.encode(note)
-            notesCollection(uid: uid).document(id).setData(data, completion: completion)
+            try notesCollection(uid: uid)
+                .document(id)
+                .setData(from: note)
+            completion?(nil)
         } catch {
             completion?(error)
         }
     }
     
-    func deleteNote(uid: String, noteId: String, completion: ((Error?) -> Void)? = nil) {
-        notesCollection(uid: uid).document(noteId).delete(completion: completion)
+    func deleteNote(
+        uid: String,
+        noteId: String,
+        completion: ((Error?) -> Void)? = nil
+    ) {
+        notesCollection(uid: uid)
+            .document(noteId)
+            .delete(completion: completion)
+    }
+
+    /// Generic note update (used to move between folders, etc.)
+    /// When `note.folderId == nil`, we explicitly delete `folderId` in Firestore
+    /// so the note becomes an "unfiled" note in the root "Notes" view.
+    func updateNote(
+        uid: String,
+        note: SNNote,
+        completion: ((Error?) -> Void)? = nil
+    ) {
+        var data: [String: Any] = [
+            "title": note.title,
+            "content": note.content,
+            "updatedAt": note.updatedAt
+        ]
+
+        if let audioUrl = note.audioUrl {
+            data["audioUrl"] = audioUrl
+        }
+        
+        if let folderId = note.folderId {
+            // Move into a specific folder
+            data["folderId"] = folderId
+        } else {
+            // Move to "Notes" (root) → remove folderId field
+            data["folderId"] = FieldValue.delete()
+        }
+
+        notesCollection(uid: uid)
+            .document(note.id)
+            .updateData(data) { error in
+                completion?(error)
+            }
     }
     
     // MARK: - Recordings + Storage
@@ -114,7 +169,9 @@ final class FirebaseNoteService {
         completion: @escaping (Result<String, Error>) -> Void
     ) {
         let recordingId = UUID().uuidString
-        let ref = storage.reference().child("recordings/\(uid)/\(recordingId).m4a")
+        let ref = storage
+            .reference()
+            .child("recordings/\(uid)/\(recordingId).m4a")
         
         ref.putFile(from: fileURL) { _, error in
             if let error = error {
