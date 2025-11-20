@@ -8,10 +8,14 @@ struct FolderDetailView: View {
         List {
             ForEach(notesViewModel.notes(in: folder)) { note in
                 NavigationLink {
-                    DetailNoteView(note: note)   // 🔥 상세 화면으로 이동
+                    DetailNoteView(note: note)   // 상세 화면
                 } label: {
-                    NoteRowView(note: note)     // 기존 리스트 UI 그대로 사용
+                    NoteRowView(note: note)     // 리스트 UI
                 }
+            }
+            .onDelete { indexSet in
+                // Delete from Firestore via NotesViewModel
+                notesViewModel.delete(at: indexSet, in: folder)
             }
         }
         .navigationTitle(folder?.name ?? "Notes")
