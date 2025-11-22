@@ -8,4 +8,7 @@ struct SNNote: Identifiable, Codable {
     var audioUrl: String?
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+    
+    // Optional for backward compatibility with existing Firestore docs
+    var isStarred: Bool? = false
 }

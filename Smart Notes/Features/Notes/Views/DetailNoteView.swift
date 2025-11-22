@@ -1,3 +1,4 @@
+// DetailNoteView.swift
 import SwiftUI
 
 struct DetailNoteView: View {
@@ -41,7 +42,7 @@ struct DetailNoteView: View {
                         .fontWeight(.bold)
                 }
                 
-                // Date
+                // Date (still based on original note.updatedAt)
                 Text("Updated: \(note.updatedAt.formatted(date: .abbreviated, time: .shortened))")
                     .font(.subheadline)
                     .foregroundColor(.gray)
@@ -81,7 +82,6 @@ struct DetailNoteView: View {
         .navigationTitle("Note Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            
             // EDIT / SAVE button
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(isEditing ? "Save" : "Edit") {

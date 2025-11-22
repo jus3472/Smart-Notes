@@ -9,16 +9,22 @@ struct FoldersListView: View {
     var body: some View {
         NavigationStack {
             List {
-                // 🔹 Notes Section
+                // Smart / quick access section
                 Section {
                     NavigationLink {
                         FolderDetailView(folder: nil)
                     } label: {
                         Label("Notes", systemImage: "tray.full")
                     }
+                    
+                    NavigationLink {
+                        StarredNotesView()
+                    } label: {
+                        Label("Starred", systemImage: "star.fill")
+                    }
                 }
                 
-                // 🔹 User-created Folders Section
+                // User-created Folders Section
                 Section("Folders") {
                     ForEach(foldersViewModel.folders) { folder in
                         NavigationLink {
