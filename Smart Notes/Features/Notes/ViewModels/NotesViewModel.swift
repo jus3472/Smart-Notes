@@ -36,10 +36,8 @@ final class NotesViewModel: ObservableObject {
     /// A specific folder shows only notes whose folderId == folder.id.
     func notes(in folder: SNFolder?) -> [SNNote] {
         if let folder = folder {
-            // Notes in a specific folder
             return notes.filter { $0.folderId == folder.id }
         } else {
-            // Root "Notes" = unfiled notes only
             return notes.filter { $0.folderId == nil }
         }
     }
@@ -67,6 +65,19 @@ final class NotesViewModel: ObservableObject {
             folderId: folderId,
             audioUrl: audioUrl
         )
+    }
+    
+    /// Update title/content of an existing note
+    func updateNote(_ note: SNNote, title: String, content: String) {
+        guard let uid = auth.currentUser?.uid else { return }
+        
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        var updated = note
+        updated.title = trimmedTitle.isEmpty ? "Untitled Note" : trimmedTitle
+        updated.content = content
+        updated.updatedAt = Date()
+        
+        service.updateNote(uid: uid, note: updated)
     }
     
     /// Move a note to another folder (or to "Notes" / no folder).
