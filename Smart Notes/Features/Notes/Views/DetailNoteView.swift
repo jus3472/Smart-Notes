@@ -1,4 +1,3 @@
-// DetailNoteView.swift
 import SwiftUI
 
 struct DetailNoteView: View {
@@ -79,7 +78,7 @@ struct DetailNoteView: View {
             }
             .padding()
         }
-        .navigationTitle("Note Details")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             // EDIT / SAVE button
