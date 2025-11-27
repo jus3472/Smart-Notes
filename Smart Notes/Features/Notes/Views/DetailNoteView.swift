@@ -9,8 +9,6 @@ struct DetailNoteView: View {
     @State private var showMoveAlert = false
     @State private var moveAlertMessage = ""
     
-    // Track the note's current folder for the Move menu.
-    // nil = "Notes" (unfiled)
     @State private var currentFolderId: String?
     
     // Editing state
@@ -29,7 +27,7 @@ struct DetailNoteView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 
-                // Title (editable)
+                // MARK: - Title
                 if isEditing {
                     TextField("Title", text: $editedTitle)
                         .font(.system(size: 28, weight: .bold))
@@ -41,14 +39,14 @@ struct DetailNoteView: View {
                         .fontWeight(.bold)
                 }
                 
-                // Date (still based on original note.updatedAt)
+                // MARK: - Date
                 Text("Updated: \(note.updatedAt.formatted(date: .abbreviated, time: .shortened))")
                     .font(.subheadline)
                     .foregroundColor(.gray)
                 
                 Divider()
                 
-                // Content (editable)
+                // MARK: - Content
                 if isEditing {
                     TextEditor(text: $editedContent)
                         .font(.body)
@@ -58,14 +56,15 @@ struct DetailNoteView: View {
                                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                         )
                 } else {
-                    Text(editedContent)
+                    // 👇 Markdown → AttributedString 렌더링
+                    Text(editedContent.markdownToAttributed())
                         .font(.body)
                         .padding(.top, 4)
                 }
                 
                 Divider()
                 
-                // If audio exists
+                // MARK: - Audio info
                 if let url = note.audioUrl {
                     Text("Associated Recording:")
                         .font(.headline)
@@ -81,35 +80,26 @@ struct DetailNoteView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // EDIT / SAVE button
+            
+            // MARK: Edit/Save button
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(isEditing ? "Save" : "Edit") {
-                    if isEditing {
-                        saveEdits()
-                    } else {
-                        isEditing = true
-                    }
+                    if isEditing { saveEdits() }
+                    else { isEditing = true }
                 }
             }
             
-            // MOVE menu
+            // MARK: Move menu
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    // Only show "Notes" if the note is NOT already in "Notes"
                     if currentFolderId != nil {
-                        Button("Notes") {
-                            moveTo(folder: nil)
-                        }
+                        Button("Notes") { moveTo(folder: nil) }
                     }
                     
-                    // Only show other folders (exclude currentFolderId)
-                    let availableFolders = foldersViewModel.folders.filter { folder in
-                        folder.id != currentFolderId
-                    }
-                    
-                    if !availableFolders.isEmpty {
+                    let available = foldersViewModel.folders.filter { $0.id != currentFolderId }
+                    if !available.isEmpty {
                         Section("Folders") {
-                            ForEach(availableFolders) { folder in
+                            ForEach(available) { folder in
                                 Button(folder.name) {
                                     moveTo(folder: folder)
                                 }
@@ -119,7 +109,7 @@ struct DetailNoteView: View {
                 } label: {
                     Label("Move", systemImage: "folder")
                 }
-                .disabled(isEditing)   // avoid moving while mid-edit
+                .disabled(isEditing)
             }
         }
         .alert("Note moved", isPresented: $showMoveAlert) {
@@ -139,21 +129,28 @@ struct DetailNoteView: View {
         isEditing = false
     }
     
-    // MARK: - Move Logic
+    // MARK: - Move
     private func moveTo(folder: SNFolder?) {
-        // Use the latest edited title/content when moving, so we don't overwrite them.
         var updatedNote = note
         updatedNote.title = editedTitle
         updatedNote.content = editedContent
         
         notesViewModel.move(updatedNote, to: folder)
-        
-        // Update local state so the menu reflects the NEW folder immediately
         currentFolderId = folder?.id
         
-        // Clear feedback
-        let targetName = folder?.name ?? "Notes"
-        moveAlertMessage = "This note has been moved to \"\(targetName)\"."
+        moveAlertMessage = "This note has been moved to \"\(folder?.name ?? "Notes")\"."
         showMoveAlert = true
+    }
+}
+
+extension String {
+    func markdownToAttributed() -> AttributedString {
+        if let attributed = try? AttributedString(
+            markdown: self,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        ) {
+            return attributed
+        }
+        return AttributedString(self)
     }
 }
