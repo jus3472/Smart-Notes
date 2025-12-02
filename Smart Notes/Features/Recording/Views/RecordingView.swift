@@ -148,17 +148,20 @@ struct RecordingView: View {
         }
 
         // MARK: Folder Picker
-        .confirmationDialog("Choose Folder", isPresented: $showFolderPicker, titleVisibility: .visible) {
+        .confirmationDialog("Choose Folder",
+                            isPresented: $showFolderPicker,
+                            titleVisibility: .visible) {
 
-            // Option 1: Notes (루트)
+            // Option 1: Notes (root)
             Button("Notes") {
                 saveNote(in: nil)
             }
 
-            // ⭐ Full Transcript 폴더는 제외한 나머지 폴더만 보여주기
+            // Exclude both "Full Transcript" AND "Notes"
             let userFolders = foldersViewModel.folders.filter {
-                $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                    .lowercased() != "full transcript".lowercased()
+                let trimmed = $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+                return trimmed != "notes" && trimmed != "full transcript"
             }
 
             // Option 2: user-created folders
@@ -170,6 +173,7 @@ struct RecordingView: View {
 
             Button("Cancel", role: .cancel) {}
         }
+
 
         // MARK: Save Alert
         .alert("Status", isPresented: $showSaveAlert) {
