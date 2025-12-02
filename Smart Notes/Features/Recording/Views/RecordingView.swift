@@ -13,6 +13,9 @@ struct RecordingView: View {
     @State private var saveMessage = ""
 
     @State private var showFolderPicker = false   // new: show folder chooser
+    
+    @State private var showFullTranscriptionPrompt = false
+    @State private var saveFullTranscript = false
 
     var body: some View {
         NavigationView {
@@ -78,7 +81,9 @@ struct RecordingView: View {
                     // SAVE BUTTON
                     Button {
                         viewModel.stopRecording()
-                        showTitlePrompt = true      // first ask for title
+                        // 기존: showTitlePrompt = true
+                        // 변경: 먼저 full transcription 저장 여부부터 물어보기
+                        showFullTranscriptionPrompt = true
                     } label: {
                         Image(systemName: "checkmark.circle.fill")
                             .resizable()
@@ -88,6 +93,7 @@ struct RecordingView: View {
                             )
                     }
                     .disabled(viewModel.recordingState != .paused)
+
 
                     Spacer()
                 }
@@ -110,6 +116,25 @@ struct RecordingView: View {
             }
             .navigationTitle("Recording")
         }
+        .confirmationDialog("Save full transcription too?",
+                            isPresented: $showFullTranscriptionPrompt,
+                            titleVisibility: .visible) {
+
+            Button("Yes, save full transcription") {
+                saveFullTranscript = true   // 👉 이 플래그를 나중에 전달
+                showTitlePrompt = true      // 다음 단계: 노트 제목 입력으로 진행
+            }
+
+            Button("No, only summary") {
+                saveFullTranscript = false
+                showTitlePrompt = true
+            }
+
+            Button("Cancel", role: .cancel) {
+                // 아무 것도 안 하고 종료
+                saveFullTranscript = false
+            }
+        }
         // MARK: Title Input
         .alert("Enter Note Title", isPresented: $showTitlePrompt) {
             TextField("Note title", text: $noteTitleInput)
@@ -125,13 +150,19 @@ struct RecordingView: View {
         // MARK: Folder Picker
         .confirmationDialog("Choose Folder", isPresented: $showFolderPicker, titleVisibility: .visible) {
 
-            // Option 1: Notes
+            // Option 1: Notes (루트)
             Button("Notes") {
                 saveNote(in: nil)
             }
 
-            // Option 2: each Firestore folder
-            ForEach(foldersViewModel.folders) { folder in
+            // ⭐ Full Transcript 폴더는 제외한 나머지 폴더만 보여주기
+            let userFolders = foldersViewModel.folders.filter {
+                $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased() != "full transcript".lowercased()
+            }
+
+            // Option 2: user-created folders
+            ForEach(userFolders) { folder in
                 Button(folder.name) {
                     saveNote(in: folder)
                 }
@@ -157,19 +188,22 @@ struct RecordingView: View {
             do {
                 try await viewModel.generateSummaryAndSave(
                     title: trimmedTitle,
-                    folderId: folder?.id       // store selected folder
+                    folderId: folder?.id,
+                    saveFullTranscript: saveFullTranscript   // ⭐ 새 파라미터
                 )
 
                 let locationName = folder?.name ?? "Notes"
                 saveMessage = "Your '\(trimmedTitle)' note has been saved in \"\(locationName)\"."
                 showSaveAlert = true
 
-                // reset title for next time
+                // reset
                 noteTitleInput = ""
+                saveFullTranscript = false   // ⭐ 다음 사용을 위해 초기화
             } catch {
                 saveMessage = "Failed to save note."
                 showSaveAlert = true
             }
         }
     }
+
 }

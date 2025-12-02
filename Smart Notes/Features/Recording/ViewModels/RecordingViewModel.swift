@@ -105,28 +105,88 @@ class RecordingViewModel: ObservableObject {
         recordingTime = String(format: "%02d:%02d", m, s)
     }
 
-    // MARK: - Save Summary
+    // MARK: - Save Summary + Optional Full Transcript with Diarization
     @MainActor
-    func generateSummaryAndSave(title: String, folderId: String?) async throws {
+    func generateSummaryAndSave(
+        title: String,
+        folderId: String?,
+        saveFullTranscript: Bool
+    ) async throws {
         guard let uid = Auth.auth().currentUser?.uid else { return }
 
         isProcessing = true
         defer { isProcessing = false }
 
         let gemini = GeminiService()
-        let summary = try await gemini.summarize(self.transcribedText)
+
+        // 1) 최종 transcript (라이브 텍스트 그대로)
+        let finalTranscript = self.transcribedText
+
+        // 2) 요약 생성
+        let summary = try await gemini.summarize(finalTranscript)
         self.aiSummary = summary
 
-        let fullContent = """
+        // 3) 액션 아이템 추출 (최대 10개)
+        let actionItems = try await gemini.extractActionItems(fromSummary: summary)
+        let limitedItems = Array(actionItems.prefix(10))
+
+        // =========================
+        // (A) 요약 노트 저장 (사용자가 고른 폴더)
+        // =========================
+
+        var actionBlock = ""
+        if !limitedItems.isEmpty {
+            let bulletLines = limitedItems
+                .map { "- [ ] \($0)" }
+                .joined(separator: "\n")
+
+            actionBlock = """
+
+            ✅ Action Items:
+            \(bulletLines)
+            """
+        }
+
+        let summaryContent = """
         📌 Summary:
-        \(summary)
+        \(summary)\(actionBlock)
         """
 
         FirebaseNoteService.shared.addNote(
             uid: uid,
-            title: title,
-            content: fullContent,
-            folderId: folderId   // store in chosen folder
+            title: title,          // 사용자가 입력한 제목
+            content: summaryContent,
+            folderId: folderId     // 사용자가 선택한 폴더
+        )
+
+        // =========================
+        // (B) Full Transcript 노트 저장 (옵션 + Diarization)
+        // =========================
+        guard saveFullTranscript else {
+            // 사용자가 "No" 선택한 경우 → 여기서 끝
+            return
+        }
+
+        // 3) Gemini로 speaker diarization 적용
+        let diarizedTranscript = try await gemini.diarize(finalTranscript)
+
+        // 4) 날짜 + "Recording" 형식으로 제목 생성
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        let dateString = formatter.string(from: Date())
+        let transcriptTitle = "\(dateString) Recording"
+
+        // 5) "Full Transcription" 폴더 id 가져오기 (없으면 생성)
+        let fullTranscriptionFolderId = try await FirebaseNoteService.shared
+            .getOrCreateFolderId(uid: uid, name: "Full Transcript")
+
+        // 6) diarized transcript만 단독으로 저장
+        FirebaseNoteService.shared.addNote(
+            uid: uid,
+            title: transcriptTitle,
+            content: diarizedTranscript,   // 🔥 화자 라벨이 붙은 버전
+            folderId: fullTranscriptionFolderId
         )
     }
+
 }

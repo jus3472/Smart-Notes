@@ -75,6 +75,62 @@ final class FirebaseNoteService {
             .delete(completion: completion)
     }
     
+    
+    // MARK: - Folders Helper (Get or Create)
+    func getOrCreateFolderId(uid: String, name: String) async throws -> String {
+        // 1) 먼저 동일 이름의 폴더가 있는지 검색
+        let query = foldersCollection(uid: uid)
+            .whereField("name", isEqualTo: name)
+            .limit(to: 1)
+        
+        // Firestore의 completion 기반 API를 async/await로 감싸기
+        let snapshot = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<QuerySnapshot, Error>) in
+            query.getDocuments { snapshot, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let snapshot = snapshot {
+                    continuation.resume(returning: snapshot)
+                } else {
+                    let err = NSError(
+                        domain: "FirebaseNoteService",
+                        code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Unknown Firestore error"]
+                    )
+                    continuation.resume(throwing: err)
+                }
+            }
+        }
+        
+        // 2) 이미 있으면 그 폴더의 id(= documentID) 리턴
+        if let existingDoc = snapshot.documents.first {
+            return existingDoc.documentID
+            // 또는 SNFolder로 decode하고 id 필드 사용해도 됨:
+            // let folder = try existingDoc.data(as: SNFolder.self)
+            // return folder.id
+        }
+        
+        // 3) 없으면 새 폴더 생성 후 그 id 리턴
+        let id = UUID().uuidString
+        let now = Date()
+        
+        let folder = SNFolder(
+            id: id,
+            name: name,
+            createdAt: now,
+            updatedAt: now
+        )
+        
+        do {
+            try foldersCollection(uid: uid)
+                .document(id)
+                .setData(from: folder)
+            return id
+        } catch {
+            throw error
+        }
+    }
+
+    
     // MARK: - Notes
     func listenNotes(
         uid: String,

@@ -15,6 +15,7 @@ final class FoldersViewModel: ObservableObject {
     
     init() {
         startListening()
+        
     }
     
     deinit {
