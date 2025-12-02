@@ -4,18 +4,40 @@ struct FolderDetailView: View {
     let folder: SNFolder?
     @EnvironmentObject var notesViewModel: NotesViewModel
     
+    private var notesInFolder: [SNNote] {
+        notesViewModel.notes(in: folder)
+    }
+    
     var body: some View {
-        List {
-            ForEach(notesViewModel.notes(in: folder)) { note in
-                NavigationLink {
-                    DetailNoteView(note: note)   // 상세 화면
-                } label: {
-                    NoteRowView(note: note)     // 리스트 UI
+        Group {
+            if notesInFolder.isEmpty {
+                // No List here → no gray card background
+                VStack(spacing: 8) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 32))
+                        .foregroundColor(.secondary)
+                    
+                    Text("No notes here yet")
+                        .font(.headline)
+                    
+                    Text("Notes you create will appear in this folder.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
-            }
-            .onDelete { indexSet in
-                // Delete from Firestore via NotesViewModel
-                notesViewModel.delete(at: indexSet, in: folder)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.top, 80)
+            } else {
+                // Normal list of notes
+                List {
+                    ForEach(notesInFolder) { note in
+                        NavigationLink {
+                            DetailNoteView(note: note)
+                        } label: {
+                            NoteRowView(note: note)
+                        }
+                    }
+                }
+                .listStyle(.insetGrouped)
             }
         }
         .navigationTitle(folder?.name ?? "Notes")

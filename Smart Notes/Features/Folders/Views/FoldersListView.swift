@@ -328,19 +328,38 @@ struct RecentlyDeletedFoldersView: View {
     let folders: [SNFolder]
 
     var body: some View {
-        List {
+        Group {
             if folders.isEmpty {
-                Text("No recently deleted folders.")
-                    .foregroundColor(.secondary)
-            } else {
-                ForEach(folders) { folder in
-                    Text(folder.name)
+                // Empty state (no List -> no gray card)
+                VStack(spacing: 8) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 32))
+                        .foregroundColor(.secondary)
+                    
+                    Text("No recently deleted folders")
+                        .font(.headline)
+                    
+                    Text("Deleted folders will appear here temporarily.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.top, 80)
+            } else {
+                // Normal list of deleted folders
+                List {
+                    ForEach(folders) { folder in
+                        Text(folder.name)
+                    }
+                }
+                .listStyle(.insetGrouped)
             }
         }
         .navigationTitle("Recently Deleted")
+        .navigationBarTitleDisplayMode(.large)
     }
 }
+
 
 struct FoldersListView_Previews: PreviewProvider {
     static var previews: some View {
