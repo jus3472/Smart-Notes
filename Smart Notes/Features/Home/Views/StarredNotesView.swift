@@ -4,13 +4,14 @@ struct StarredNotesView: View {
     @EnvironmentObject var notesViewModel: NotesViewModel
     
     private var starredNotes: [SNNote] {
-        notesViewModel.notes.filter { $0.isStarred ?? false }
+        notesViewModel.notes.filter {
+            ($0.isStarred ?? false) && !($0.isDeleted ?? false)
+        }
     }
     
     var body: some View {
         Group {
             if starredNotes.isEmpty {
-                // Empty state (no List -> no gray card)
                 VStack(spacing: 8) {
                     Image(systemName: "star")
                         .font(.system(size: 32))
@@ -26,7 +27,6 @@ struct StarredNotesView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, 80)
             } else {
-                // Normal list of starred notes
                 List {
                     ForEach(starredNotes) { note in
                         NavigationLink {
@@ -34,6 +34,11 @@ struct StarredNotesView: View {
                         } label: {
                             NoteRowView(note: note)
                         }
+                    }
+                    // allow deleting from Starred → moves to Recently Deleted
+                    .onDelete { offsets in
+                        let notesToDelete = offsets.map { starredNotes[$0] }
+                        notesToDelete.forEach { notesViewModel.delete($0) }
                     }
                 }
                 .listStyle(.insetGrouped)

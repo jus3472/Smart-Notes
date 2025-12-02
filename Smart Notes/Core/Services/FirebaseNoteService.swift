@@ -188,6 +188,9 @@ final class FirebaseNoteService {
     /// Generic note update (used to move between folders, edit text, toggle star, etc.)
     /// When `note.folderId == nil`, we explicitly delete `folderId` in Firestore
     /// so the note becomes an "unfiled" note in the root "Notes" view.
+    /// Generic note update (used to move between folders, edit text, toggle star, delete, etc.)
+    /// When `note.folderId == nil`, we explicitly delete `folderId` in Firestore
+    /// so the note becomes an "unfiled" note in the root "Notes" view.
     func updateNote(
         uid: String,
         note: SNNote,
@@ -197,13 +200,29 @@ final class FirebaseNoteService {
             "title": note.title,
             "content": note.content,
             "updatedAt": note.updatedAt,
-            "isStarred": note.isStarred ?? false
+            "isStarred": note.isStarred ?? false,
+            "isDeleted": note.isDeleted ?? false
         ]
 
         if let audioUrl = note.audioUrl {
             data["audioUrl"] = audioUrl
         }
+
+        // deletedAt
+        if let deletedAt = note.deletedAt {
+            data["deletedAt"] = deletedAt
+        } else {
+            data["deletedAt"] = FieldValue.delete()
+        }
+
+        // originalFolderId
+        if let originalFolderId = note.originalFolderId {
+            data["originalFolderId"] = originalFolderId
+        } else {
+            data["originalFolderId"] = FieldValue.delete()
+        }
         
+        // folderId
         if let folderId = note.folderId {
             // Move into a specific folder
             data["folderId"] = folderId

@@ -1,3 +1,4 @@
+// SNNote.swift
 import Foundation
 
 struct SNNote: Identifiable, Codable {
@@ -9,6 +10,10 @@ struct SNNote: Identifiable, Codable {
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     
-    // Optional for backward compatibility with existing Firestore docs
     var isStarred: Bool? = false
+    
+    // soft delete support
+    var isDeleted: Bool? = false
+    var deletedAt: Date?
+    var originalFolderId: String?
 }

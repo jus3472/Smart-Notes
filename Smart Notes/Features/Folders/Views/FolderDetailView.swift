@@ -1,3 +1,4 @@
+// FolderDetailView.swift
 import SwiftUI
 
 struct FolderDetailView: View {
@@ -11,7 +12,7 @@ struct FolderDetailView: View {
     var body: some View {
         Group {
             if notesInFolder.isEmpty {
-                // No List here → no gray card background
+                // Empty state
                 VStack(spacing: 8) {
                     Image(systemName: "note.text")
                         .font(.system(size: 32))
@@ -27,7 +28,6 @@ struct FolderDetailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, 80)
             } else {
-                // Normal list of notes
                 List {
                     ForEach(notesInFolder) { note in
                         NavigationLink {
@@ -35,6 +35,9 @@ struct FolderDetailView: View {
                         } label: {
                             NoteRowView(note: note)
                         }
+                    }
+                    .onDelete { offsets in
+                        notesViewModel.delete(at: offsets, in: folder)
                     }
                 }
                 .listStyle(.insetGrouped)

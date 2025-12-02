@@ -24,9 +24,6 @@ struct FoldersListView: View {
         isSearchFocused || !searchText.isEmpty
     }
 
-    // Recently Deleted (local list for now)
-    @State private var recentlyDeletedFolders: [SNFolder] = []
-
     // Delete confirmation state
     @State private var folderToDelete: SNFolder?
     @State private var isShowingDeleteAlert = false
@@ -76,7 +73,7 @@ struct FoldersListView: View {
                         }
 
                         NavigationLink {
-                            RecentlyDeletedFoldersView(folders: recentlyDeletedFolders)
+                            RecentlyDeletedNotesView()
                         } label: {
                             Label("Recently Deleted", systemImage: "trash")
                         }
@@ -103,7 +100,6 @@ struct FoldersListView: View {
                                 if isEditingFolders {
                                     Spacer()
 
-                                    // Delete button on the right (NOT shown for protected "Notes")
                                     if !isProtected {
                                         Button(role: .destructive) {
                                             folderToDelete = folder
@@ -117,11 +113,9 @@ struct FoldersListView: View {
                                     }
                                 }
                             }
-                            .deleteDisabled(true)  // hide system left red minus
+                            .deleteDisabled(true)
                         }
-                        // Only use system move handle (no system delete)
                         .onMove { indices, offset in
-                            // Move inside the full array using IDs
                             let ids = indices.map { visibleFolders[$0].id }
                             var all = foldersViewModel.folders
                             for id in ids {
@@ -159,7 +153,6 @@ struct FoldersListView: View {
                 }
             }
             .listStyle(.insetGrouped)
-            // keep system move handle active but we control editing via our button
             .environment(\.editMode,
                          .constant(isEditingFolders ? EditMode.active : EditMode.inactive))
             .navigationTitle("Smart Notes")
@@ -223,7 +216,10 @@ struct FoldersListView: View {
               let index = foldersViewModel.folders.firstIndex(where: { $0.id == folder.id })
         else { return }
 
-        recentlyDeletedFolders.append(folder)
+        // 1) Move all notes from this folder into Recently Deleted
+        notesViewModel.deleteNotes(inFolder: folder)
+
+        // 2) Delete the folder itself from Firestore
         let set = IndexSet(integer: index)
         foldersViewModel.deleteFolder(at: set)
     }
@@ -322,34 +318,50 @@ struct FoldersListView: View {
     }
 }
 
-// MARK: - Recently Deleted Screen
+// MARK: - Recently Deleted Notes
 
-struct RecentlyDeletedFoldersView: View {
-    let folders: [SNFolder]
-
+struct RecentlyDeletedNotesView: View {
+    @EnvironmentObject var notesViewModel: NotesViewModel
+    
+    private var deletedNotes: [SNNote] {
+        notesViewModel.deletedNotes
+    }
+    
     var body: some View {
         Group {
-            if folders.isEmpty {
-                // Empty state (no List -> no gray card)
+            if deletedNotes.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "trash")
                         .font(.system(size: 32))
                         .foregroundColor(.secondary)
                     
-                    Text("No recently deleted folders")
+                    Text("No recently deleted notes")
                         .font(.headline)
                     
-                    Text("Deleted folders will appear here temporarily.")
+                    Text("Deleted notes will appear here for now.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, 80)
             } else {
-                // Normal list of deleted folders
                 List {
-                    ForEach(folders) { folder in
-                        Text(folder.name)
+                    ForEach(deletedNotes) { note in
+                        NavigationLink {
+                            DeletedNoteDetailView(note: note)
+                        } label: {
+                            NoteRowView(note: note, showStar: false)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button("Restore") {
+                                notesViewModel.restore(note)
+                            }
+                            .tint(.green)
+                            
+                            Button("Delete", role: .destructive) {
+                                notesViewModel.deleteForever(note)
+                            }
+                        }
                     }
                 }
                 .listStyle(.insetGrouped)
@@ -360,6 +372,35 @@ struct RecentlyDeletedFoldersView: View {
     }
 }
 
+// MARK: - Read-only detail for deleted notes
+
+struct DeletedNoteDetailView: View {
+    let note: SNNote
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(note.title)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                
+                if let deletedAt = note.deletedAt {
+                    Text("Deleted: \(deletedAt.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+                
+                Divider()
+                
+                Text(note.content)
+                    .font(.body)
+            }
+            .padding()
+        }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
 
 struct FoldersListView_Previews: PreviewProvider {
     static var previews: some View {
