@@ -31,14 +31,20 @@ struct FoldersListView: View {
     @State private var folderToDelete: SNFolder?
     @State private var isShowingDeleteAlert = false
 
+    // MARK: - Derived folder list (hide default "Notes" folder)
+    private var visibleFolders: [SNFolder] {
+        foldersViewModel.folders.filter { !isProtectedFolder($0) }
+    }
+
     var body: some View {
         NavigationStack {
             List {
                 if isSearching {
                     // ===== SEARCH MODE =====
+                    let base = visibleFolders
                     let folders = searchText.isEmpty
-                        ? foldersViewModel.folders
-                        : foldersViewModel.folders.filter {
+                        ? base
+                        : base.filter {
                             $0.name.localizedCaseInsensitiveContains(searchText)
                         }
 
@@ -55,7 +61,7 @@ struct FoldersListView: View {
                 } else {
                     // ===== NORMAL MODE =====
 
-                    // Quick access
+                    // MARK: Primary section: Notes, Starred, Recently Deleted
                     Section {
                         NavigationLink {
                             FolderDetailView(folder: nil)
@@ -68,32 +74,22 @@ struct FoldersListView: View {
                         } label: {
                             Label("Starred", systemImage: "star.fill")
                         }
+
+                        NavigationLink {
+                            RecentlyDeletedFoldersView(folders: recentlyDeletedFolders)
+                        } label: {
+                            Label("Recently Deleted", systemImage: "trash")
+                        }
+                    } header: {
+                        Text("Primary")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .textCase(.uppercase)
                     }
 
-                    // Main folders
-                    Section(
-                        header:
-                            HStack {
-                                Text("Folders")
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
-
-                                Spacer()
-
-                                if !foldersViewModel.folders.isEmpty {
-                                    Button(isEditingFolders ? "Done" : "Edit") {
-                                        withAnimation { isEditingFolders.toggle() }
-                                    }
-                                    .font(.subheadline.weight(.semibold))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 4)
-                                    .background(Color.blue.opacity(0.15))
-                                    .foregroundColor(.blue)
-                                    .cornerRadius(10)
-                                }
-                            }
-                    ) {
-                        ForEach(foldersViewModel.folders) { folder in
+                    // MARK: Main folders (excluding the default "Notes" folder)
+                    Section {
+                        ForEach(visibleFolders) { folder in
                             let isProtected = isProtectedFolder(folder)
 
                             HStack {
@@ -107,7 +103,7 @@ struct FoldersListView: View {
                                 if isEditingFolders {
                                     Spacer()
 
-                                    // 🔴 Delete button on the right (NOT shown for protected "Notes")
+                                    // Delete button on the right (NOT shown for protected "Notes")
                                     if !isProtected {
                                         Button(role: .destructive) {
                                             folderToDelete = folder
@@ -125,14 +121,39 @@ struct FoldersListView: View {
                         }
                         // Only use system move handle (no system delete)
                         .onMove { indices, offset in
-                            foldersViewModel.folders.move(fromOffsets: indices, toOffset: offset)
+                            // Move inside the full array using IDs
+                            let ids = indices.map { visibleFolders[$0].id }
+                            var all = foldersViewModel.folders
+                            for id in ids {
+                                if let from = all.firstIndex(where: { $0.id == id }) {
+                                    let folder = all.remove(at: from)
+                                    let to = min(offset, all.count)
+                                    all.insert(folder, at: to)
+                                }
+                            }
+                            foldersViewModel.folders = all
                         }
 
-                        // Recently Deleted row opens its list
-                        NavigationLink {
-                            RecentlyDeletedFoldersView(folders: recentlyDeletedFolders)
-                        } label: {
-                            Label("Recently Deleted", systemImage: "trash")
+                    } header: {
+                        HStack {
+                            Text("Folders")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .textCase(.uppercase)
+
+                            Spacer()
+
+                            if !visibleFolders.isEmpty {
+                                Button(isEditingFolders ? "Done" : "Edit") {
+                                    withAnimation { isEditingFolders.toggle() }
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(Color.blue.opacity(0.15))
+                                .foregroundColor(.blue)
+                                .cornerRadius(10)
+                            }
                         }
                     }
                 }
