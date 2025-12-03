@@ -68,6 +68,7 @@ struct LoginScreen: View {
                         TextField("Enter your email", text: $authViewModel.email)
                             .textInputAutocapitalization(.never)
                             .padding(.vertical, 8)
+                            .foregroundColor(.black)          // 👈 입력 텍스트 색상
                             .focused($focusedField, equals: .email)
 
                         Divider().background(Color.gray.opacity(0.2))
@@ -81,6 +82,7 @@ struct LoginScreen: View {
 
                         SecureField("Enter your password", text: $authViewModel.password)
                             .padding(.vertical, 8)
+                            .foregroundColor(.black)          // 👈 입력 텍스트 색상
                             .focused($focusedField, equals: .password)
 
                         Divider().background(Color.gray.opacity(0.2))
