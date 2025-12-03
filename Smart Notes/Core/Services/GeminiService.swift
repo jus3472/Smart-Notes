@@ -228,5 +228,75 @@ class GeminiService {
 
         return Array(allItems.prefix(10))
     }
+    
+    
+    // GeminiService.swift
+
+    // MARK: - Tags 추출
+    func extractTags(fromSummary summary: String) async throws -> [String] {
+        let url = URL(string:
+            "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)"
+        )!
+
+        // 👉 프롬프트: "콤마로 구분된 태그만" 달라고 강하게 요구
+        let prompt = """
+        You are SmartNotes, an intelligent academic note assistant.
+
+        Task:
+        From the following summary of a lecture or meeting, generate 3-10 short, meaningful tags.
+
+        Requirements:
+        - Each tag must be SHORT (1–3 words), like: "Dynamic Programming", "Greedy", "Time Complexity".
+        - Focus on key topics, concepts, or tasks.
+        - Do NOT include bullets, numbers, or extra text.
+        - Return ONLY a comma-separated list of tags. For example:
+          Dynamic Programming, DP Recurrence, Memoization, Complexity Analysis
+
+        Summary:
+        \(summary)
+        """
+
+        let requestBody: [String: Any] = [
+            "contents": [
+                [
+                    "parts": [
+                        ["text": prompt]
+                    ]
+                ]
+            ]
+        ]
+
+        let data = try JSONSerialization.data(withJSONObject: requestBody)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = data
+
+        let (responseData, _) = try await URLSession.shared.data(for: request)
+
+        // 디버깅용
+        if let raw = try? JSONSerialization.jsonObject(with: responseData) {
+            print("🏷️ DEBUG Gemini tags response:", raw)
+        }
+
+        let decoded = try JSONDecoder().decode(Response.self, from: responseData)
+
+        let rawText =
+            decoded.candidates.first?.output ??
+            decoded.candidates.first?.content?.parts.first?.text ??
+            ""
+
+        // "Tag1, Tag2\nTag3" 이런 형식 → 콤마 기준으로 잘라서 정리
+        let tags = rawText
+            .replacingOccurrences(of: "\n", with: ",")
+            .components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        print("🏷️ Parsed tags:", tags)
+
+        return tags
+    }
 
 }

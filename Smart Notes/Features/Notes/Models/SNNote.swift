@@ -16,4 +16,6 @@ struct SNNote: Identifiable, Codable {
     var isDeleted: Bool? = false
     var deletedAt: Date?
     var originalFolderId: String?
+    
+    var tags: [String] = [] 
 }

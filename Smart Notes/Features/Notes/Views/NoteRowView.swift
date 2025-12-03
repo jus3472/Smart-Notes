@@ -1,4 +1,3 @@
-// NoteRowView.swift
 import SwiftUI
 
 struct NoteRowView: View {
@@ -9,14 +8,27 @@ struct NoteRowView: View {
     var showStar: Bool = true
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 6) {
+                // TITLE
                 Text(note.title)
                     .font(.headline)
                 
-                Text(note.content.markdownToPlain())
-                    .font(.subheadline)
-                    .lineLimit(2)
+                // TAGS (최대 10개, 가로 스크롤)
+                if !note.tags.isEmpty {
+                    let limited = Array(note.tags.prefix(10))
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(limited, id: \.self) { tag in
+                                TagChip(text: tag)
+                            }
+                        }
+                    }
+                }
+                
+                // PREVIEW (📌 Summary: 제거 + markdown 제거)
+                Text(note.createdAt.formatted(date: .abbreviated,time: .shortened))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
             
@@ -32,11 +44,51 @@ struct NoteRowView: View {
                 .buttonStyle(.borderless)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }
 
-// markdownToPlain extension unchanged
+// MARK: - Tag Chip
+
+struct TagChip: View {
+    let text: String
+    
+    var body: some View {
+        Text(text)
+            .font(.caption)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(tagColor.opacity(0.15))
+            )
+            .foregroundColor(tagColor)
+    }
+    
+    private var tagColor: Color {
+        let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .teal]
+        let idx = abs(text.hashValue) % colors.count
+        return colors[idx]
+    }
+}
+
+// MARK: - Helpers
+
+extension SNNote {
+    /// 리스트에 보여줄 한 줄 요약
+    var previewText: String {
+        var plain = content.markdownToPlain()
+        plain = plain.replacingOccurrences(of: "📌 Summary:", with: "")
+        plain = plain.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if let first = plain.components(separatedBy: .newlines).first {
+            return first
+        }
+        return plain
+    }
+}
+
+// 기존 markdownToPlain 그대로 사용
 extension String {
     func markdownToPlain() -> String {
         var s = self

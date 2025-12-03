@@ -152,6 +152,7 @@ final class FirebaseNoteService {
         content: String,
         folderId: String? = nil,
         audioUrl: String? = nil,
+        tags: [String]? = nil,
         completion: ((Error?) -> Void)? = nil
     ) {
         let id = UUID().uuidString
@@ -162,7 +163,8 @@ final class FirebaseNoteService {
             folderId: folderId,
             audioUrl: audioUrl,
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            tags: tags ?? []
         )
 
         do {
@@ -229,6 +231,12 @@ final class FirebaseNoteService {
         } else {
             // Move to "Notes" (root) → remove folderId field
             data["folderId"] = FieldValue.delete()
+        }
+        
+        if !note.tags.isEmpty {
+            data["tags"] = note.tags
+        } else {
+            data["tags"] = FieldValue.delete()
         }
 
         notesCollection(uid: uid)

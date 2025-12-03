@@ -140,7 +140,10 @@ class RecordingViewModel: ObservableObject {
         let actionItems = try await gemini.extractActionItems(fromSummary: summary)
         let limitedItems = Array(actionItems.prefix(10))
 
-       
+        let rawTags = try await gemini.extractTags(fromSummary: summary)
+        let tags = Array(rawTags.prefix(10))
+        
+        print("🎯 TAGS TO SAVE:", tags)
 
         var actionBlock = ""
         if !limitedItems.isEmpty {
@@ -164,7 +167,8 @@ class RecordingViewModel: ObservableObject {
             uid: uid,
             title: title,
             content: summaryContent,
-            folderId: folderId
+            folderId: folderId,
+            tags: tags
         )
 
         // =========================
@@ -188,7 +192,8 @@ class RecordingViewModel: ObservableObject {
             uid: uid,
             title: transcriptTitle,
             content: diarizedTranscript,
-            folderId: fullTranscriptionFolderId
+            folderId: fullTranscriptionFolderId,
+            tags: tags
         )
     }
 }
