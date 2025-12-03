@@ -1,7 +1,3 @@
-//
-//  RecordingViewModel.swift
-//
-
 import SwiftUI
 import Combine
 import FirebaseAuth
@@ -29,7 +25,7 @@ class RecordingViewModel: ObservableObject {
     private var seconds = 0
     private var cancellables = Set<AnyCancellable>()
 
-    @Published var isPaused: Bool = false   // ⭐ 추가: UI 업데이트 제어용
+    @Published var isPaused: Bool = false
 
     init() {
 
@@ -39,10 +35,18 @@ class RecordingViewModel: ObservableObject {
             .sink { [weak self] newValue in
                 guard let self = self else { return }
 
-                // ⭐ Pause 상태일 때는 UI 업데이트 무시
+               
                 if self.isPaused { return }
 
-                // Resume 중에는 LiveService가 append하여 push
+              
+                if self.recordingState == .idle { return }
+
+                
+                if newValue.isEmpty && !self.transcribedText.isEmpty {
+                    return
+                }
+
+               
                 self.transcribedText = newValue
             }
             .store(in: &cancellables)
@@ -56,6 +60,11 @@ class RecordingViewModel: ObservableObject {
     // MARK: - Recording Control
     func startRecording() {
         isPaused = false
+
+      
+        transcribedText = ""
+        aiSummary = ""
+
         liveService.requestAuthorization()
         liveService.start()
         startTimer(reset: true)
@@ -63,7 +72,7 @@ class RecordingViewModel: ObservableObject {
     }
 
     func pauseRecording() {
-        isPaused = true         // ⭐ pause 상태
+        isPaused = true
         liveService.pause()
         stopTimer()
         recordingState = .paused
@@ -82,6 +91,7 @@ class RecordingViewModel: ObservableObject {
         stopTimer()
         recordingTime = "00:00"
         recordingState = .idle
+       
     }
 
     // MARK: - Timer
@@ -119,20 +129,18 @@ class RecordingViewModel: ObservableObject {
 
         let gemini = GeminiService()
 
-        // 1) 최종 transcript (라이브 텍스트 그대로)
+       
         let finalTranscript = self.transcribedText
 
-        // 2) 요약 생성
+        
         let summary = try await gemini.summarize(finalTranscript)
         self.aiSummary = summary
 
-        // 3) 액션 아이템 추출 (최대 10개)
+        
         let actionItems = try await gemini.extractActionItems(fromSummary: summary)
         let limitedItems = Array(actionItems.prefix(10))
 
-        // =========================
-        // (A) 요약 노트 저장 (사용자가 고른 폴더)
-        // =========================
+       
 
         var actionBlock = ""
         if !limitedItems.isEmpty {
@@ -154,39 +162,33 @@ class RecordingViewModel: ObservableObject {
 
         FirebaseNoteService.shared.addNote(
             uid: uid,
-            title: title,          // 사용자가 입력한 제목
+            title: title,
             content: summaryContent,
-            folderId: folderId     // 사용자가 선택한 폴더
+            folderId: folderId
         )
 
         // =========================
         // (B) Full Transcript 노트 저장 (옵션 + Diarization)
         // =========================
         guard saveFullTranscript else {
-            // 사용자가 "No" 선택한 경우 → 여기서 끝
             return
         }
 
-        // 3) Gemini로 speaker diarization 적용
         let diarizedTranscript = try await gemini.diarize(finalTranscript)
 
-        // 4) 날짜 + "Recording" 형식으로 제목 생성
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
         let dateString = formatter.string(from: Date())
         let transcriptTitle = "\(dateString) Recording"
 
-        // 5) "Full Transcription" 폴더 id 가져오기 (없으면 생성)
         let fullTranscriptionFolderId = try await FirebaseNoteService.shared
             .getOrCreateFolderId(uid: uid, name: "Full Transcript")
 
-        // 6) diarized transcript만 단독으로 저장
         FirebaseNoteService.shared.addNote(
             uid: uid,
             title: transcriptTitle,
-            content: diarizedTranscript,   // 🔥 화자 라벨이 붙은 버전
+            content: diarizedTranscript,
             folderId: fullTranscriptionFolderId
         )
     }
-
 }

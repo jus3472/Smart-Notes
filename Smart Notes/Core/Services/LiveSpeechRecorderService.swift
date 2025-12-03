@@ -66,13 +66,18 @@ class LiveSpeechRecorderService: NSObject, ObservableObject {
         recognitionTask = nil
         recognitionRequest = nil
 
+        // ✅ 지금 화면에 보이는 텍스트를 그대로 누적본으로 저장
+        accumulatedText = transcribedText
+
         DispatchQueue.main.async {
+            // ✅ accumulatedText가 항상 최신값이라, 여기서 날아가는 일 없음
             self.transcribedText = self.accumulatedText
         }
 
         isRecording = false
         isResuming = false
     }
+
 
     // MARK: - RESUME
     func resume() {
