@@ -10,30 +10,55 @@ struct SignUpScreen: View {
     let underlineBlue = Color(hex: "1B75DF")
     let accentBlue    = Color(hex: "78ABE8")
 
-    // For keyboard focus + dismissal
-    @FocusState private var focusedField: Field?
-
     enum Field {
         case email
         case password
         case confirm
     }
 
+    // For keyboard focus + dismissal
+    @FocusState private var focusedField: Field?
+
+    // MARK: - Keyboard helpers
+    private var isKeyboardActive: Bool {
+        focusedField != nil
+    }
+
+    // Standard form movement
+    private var keyboardOffset: CGFloat {
+        isKeyboardActive ? -180 : 0      // tweak if needed
+    }
+
+    // Wave gets a little extra lift
+    private var waveOffset: CGFloat {
+        isKeyboardActive ? keyboardOffset * 1.45 : 0
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
 
-            // Blue patterned header with wave
-            Image("Vector 2")
-                .resizable()
-                .scaledToFill()
-                .frame(height: 180)
-                .offset(y: 20)
-                .ignoresSafeArea(edges: .top)
+            // ================
+            // HEADER (wave)
+            // ================
+            VStack(spacing: 0) {
+                Image("Vector 2")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 180)
+                    .offset(y: 20)
+                    .ignoresSafeArea(edges: .top)
 
+                Spacer().frame(height: 0)
+            }
+            .offset(y: waveOffset)       // 👈 move header more than form
+
+            // ================
+            // CONTENT (ScrollView)
+            // ================
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
 
-                    // Push content down so title sits in the wave dip
+                    // Push content down so title sits in wave dip
                     Spacer().frame(height: 230)
 
                     // "Sign up" title + blue underline
@@ -104,7 +129,7 @@ struct SignUpScreen: View {
                         // Create Account button
                         Button {
                             guard confirmPassword == authViewModel.password else {
-                                // hook into your VM if you want an error
+                                // TODO: hook into your ViewModel for an error
                                 return
                             }
                             authViewModel.signUp()
@@ -136,17 +161,15 @@ struct SignUpScreen: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 24)
                 }
-                // Tap anywhere in the scroll area to dismiss keyboard
                 .contentShape(Rectangle())
                 .onTapGesture {
                     focusedField = nil
                 }
             }
+            .offset(y: keyboardOffset)   // 👈 form moves normally
         }
-        // Don't animate layout changes when focus changes (removes the “bounce” feel)
-        .animation(.none, value: focusedField)
-        // Let keyboard overlap bottom instead of pushing everything hard
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .animation(.easeOut(duration: 0.22), value: isKeyboardActive)
+        .ignoresSafeArea(.keyboard)      // let our offsets control layout
         .background(Color.white.ignoresSafeArea())
     }
 }

@@ -9,7 +9,6 @@ struct LoginScreen: View {
     let underlineBlue = Color(hex: "1B75DF")
     let accentBlue    = Color(hex: "78ABE8")
 
-    // MARK: - Focus handling
     enum Field {
         case email
         case password
@@ -17,30 +16,45 @@ struct LoginScreen: View {
 
     @FocusState private var focusedField: Field?
 
-    // Any field focused?
+    // Is keyboard active?
     private var isKeyboardActive: Bool {
         focusedField != nil
+    }
+
+    // Standard form movement
+    private var keyboardOffset: CGFloat {
+        isKeyboardActive ? -180 : 0     // tweak as needed
+    }
+
+    // Wave needs more lift
+    private var waveOffset: CGFloat {
+        isKeyboardActive ? keyboardOffset * 1.45 : 0
     }
 
     var body: some View {
         ZStack(alignment: .top) {
 
-            // HEADER IMAGE (wave)
+            // =====================
+            // HEADER WAVE (moves more)
+            // =====================
             VStack(spacing: 0) {
                 Image("Vector 2")
                     .resizable()
                     .scaledToFill()
                     .frame(height: 260)
-                    .offset(y: 20)      // your tuned position
+                    .offset(y: 20)
                     .ignoresSafeArea(edges: .top)
 
                 Spacer().frame(height: 0)
             }
+            .offset(y: waveOffset)   // 👈 wave moves MORE
 
-            // CONTENT (title + form)
+
+            // =====================
+            // CONTENT (Login form)
+            // =====================
             VStack(alignment: .leading, spacing: 0) {
 
-                // Push down so Login title sits in wave dip
                 Spacer().frame(height: 260)
 
                 // LOGIN TITLE
@@ -68,7 +82,7 @@ struct LoginScreen: View {
                         TextField("Enter your email", text: $authViewModel.email)
                             .textInputAutocapitalization(.never)
                             .padding(.vertical, 8)
-                            .foregroundColor(.black)          // 👈 입력 텍스트 색상
+                            .foregroundColor(.black)
                             .focused($focusedField, equals: .email)
 
                         Divider().background(Color.gray.opacity(0.2))
@@ -82,13 +96,13 @@ struct LoginScreen: View {
 
                         SecureField("Enter your password", text: $authViewModel.password)
                             .padding(.vertical, 8)
-                            .foregroundColor(.black)          // 👈 입력 텍스트 색상
+                            .foregroundColor(.black)
                             .focused($focusedField, equals: .password)
 
                         Divider().background(Color.gray.opacity(0.2))
                     }
 
-                    // Error
+                    // Error message
                     if let error = authViewModel.errorMessage {
                         Text(error)
                             .foregroundColor(.red)
@@ -147,16 +161,12 @@ struct LoginScreen: View {
 
                 Spacer()
             }
-            // tap anywhere in content to dismiss keyboard
+            .offset(y: keyboardOffset)   // 👈 form moves normally
             .contentShape(Rectangle())
-            .onTapGesture {
-                focusedField = nil
-            }
+            .onTapGesture { focusedField = nil }
         }
-        // 👇 move the WHOLE screen (wave + content) when keyboard is active
-        .offset(y: isKeyboardActive ? -180 : 0)   // tweak -180 as needed
-        .animation(.easeOut(duration: 0.2), value: isKeyboardActive)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .animation(.easeOut(duration: 0.22), value: isKeyboardActive)
+        .ignoresSafeArea(.keyboard)
         .background(Color.white.ignoresSafeArea())
     }
 }
