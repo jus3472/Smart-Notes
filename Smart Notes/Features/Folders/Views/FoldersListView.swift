@@ -36,211 +36,235 @@ struct FoldersListView: View {
         foldersViewModel.folders.filter { !isProtectedFolder($0) }
     }
 
+    // MARK: - Body
+
     var body: some View {
         NavigationStack {
-            List {
-                if isSearching {
-                    let base = visibleFolders
-                    let folders = searchText.isEmpty
-                        ? base
-                        : base.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+            mainList
+                .toolbarBackground(.clear, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    toolbarContent
+                }
 
-                    Section(header: Text(searchText.isEmpty ? "Suggested" : "Results")) {
-                        ForEach(folders) { folder in
-                            NavigationLink {
-                                FolderDetailView(folder: folder)
-                            } label: {
-                                Label(folder.name, systemImage: "folder")
-                            }
-                        }
-                    }
-
-                } else {
-                    // PRIMARY
-                    Section {
-                        NavigationLink { FolderDetailView(folder: nil) } label: {
-                            Label("Notes", systemImage: "tray.full")
-                        }
-
-                        NavigationLink { StarredNotesView() } label: {
-                            Label("Starred", systemImage: "star.fill")
-                        }
-
-                        NavigationLink { RecentlyDeletedNotesView() } label: {
-                            Label("Recently Deleted", systemImage: "trash")
-                        }
-                    } header: {
-                        Text("Primary")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .textCase(.uppercase)
-                    }
-
-                    // FOLDERS
-                    Section {
-                        ForEach(visibleFolders) { folder in
-                            let isProtected = isProtectedFolder(folder)
-
-                            HStack {
-                                NavigationLink {
-                                    FolderDetailView(folder: folder)
-                                } label: {
-                                    Label(folder.name, systemImage: "folder")
+                // ⬇️ Tap-to-dismiss overlay *behind* the bottom bar & FAB
+                .overlay(
+                    Group {
+                        if isKeyboardActive || isFabExpanded {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                // cover everything except the bottom inset
+                                .ignoresSafeArea(edges: [.top, .horizontal])
+                                .onTapGesture {
+                                    collapseFab()
+                                    dismissKeyboard()
                                 }
-
-                                if isEditingFolders && !isProtected {
-                                    Spacer()
-                                    Button(role: .destructive) {
-                                        folderToDelete = folder
-                                        isShowingDeleteAlert = true
-                                    } label: {
-                                        Image(systemName: "minus.circle.fill")
-                                            .foregroundColor(.red)
-                                            .imageScale(.large)
-                                    }
-                                    .buttonStyle(.borderless)
-                                }
-                            }
-                            .deleteDisabled(true)
-                        }
-                        .onMove { indices, offset in
-                            let ids = indices.map { visibleFolders[$0].id }
-                            var all = foldersViewModel.folders
-                            for id in ids {
-                                if let from = all.firstIndex(where: { $0.id == id }) {
-                                    let folder = all.remove(at: from)
-                                    let to = min(offset, all.count)
-                                    all.insert(folder, at: to)
-                                }
-                            }
-                            foldersViewModel.folders = all
-                        }
-                    } header: {
-                        HStack {
-                            Text("Folders")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .textCase(.uppercase)
-
-                            Spacer()
-
-                            if !visibleFolders.isEmpty {
-                                Button(isEditingFolders ? "Done" : "Edit") {
-                                    withAnimation { isEditingFolders.toggle() }
-                                }
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 4)
-                                .background(Color.blue.opacity(0.15))
-                                .foregroundColor(.blue)
-                                .cornerRadius(10)
-                            }
                         }
                     }
-                }
-            }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .background(Color(.systemGroupedBackground))
-            .padding(.top, 8)
+                )
 
-            // TAP ANYWHERE -> dismiss keyboard + collapse FAB
-            .simultaneousGesture(
-                TapGesture().onEnded {
-                    collapseFab()
-                    dismissKeyboard()
-                }
-            )
-
-            // CONTROL SWIFTUI EDIT MODE
-            .environment(\.editMode,
-                         .constant(isEditingFolders ? EditMode.active : EditMode.inactive))
-
-            // FIX: if all folders deleted, exit edit mode before button disappears
-            .onChange(of: visibleFolders.isEmpty) { isEmpty in
-                if isEmpty && isEditingFolders {
-                    withAnimation { isEditingFolders = false }
-                }
-            }
-
-            // ---------- TOOLBAR ----------
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.clear, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack {
-                        Image("smart_notes_logo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 55)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.leading, -8)
-                    .padding(.top, 12)
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        collapseFab()
-                        dismissKeyboard()
-                        activeSheet = .settings
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .imageScale(.large)
+                // Bottom search bar + FAB (on top of dismiss overlay)
+                .safeAreaInset(edge: .bottom) {
+                    if !showAddFolder {
+                        bottomBarWithSearchAndFab
                     }
                 }
-            }
 
-            // ---------- BOTTOM SEARCH + FAB ----------
-            .safeAreaInset(edge: .bottom) {
-                if !showAddFolder {
-                    bottomBarWithSearchAndFab
+                .sheet(item: $activeSheet) { sheet in
+                    switch sheet {
+                    case .recording: RecordingView()
+                    case .settings: SettingsView()
+                    }
                 }
-            }
 
-            .sheet(item: $activeSheet) { sheet in
-                switch sheet {
-                case .recording: RecordingView()
-                case .settings: SettingsView()
+                .alert("Delete Folder?",
+                       isPresented: $isShowingDeleteAlert,
+                       presenting: folderToDelete) { folder in
+                    Button("Cancel", role: .cancel) {}
+                    Button("Delete", role: .destructive) {
+                        performConfirmedDelete(folder: folder)
+                    }
+                } message: { folder in
+                    Text("""
+                    Are you sure you want to delete "\(folder.name)"?
+                    All notes inside this folder will move to Recently Deleted.
+                    """)
                 }
-            }
 
-            // DELETE ALERT
-            .alert("Delete Folder?",
-                   isPresented: $isShowingDeleteAlert,
-                   presenting: folderToDelete) { folder in
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
-                    performConfirmedDelete(folder: folder)
+                // Add-folder overlay (on very top)
+                .overlay {
+                    if showAddFolder {
+                        AddFolderOverlayView(isPresented: $showAddFolder)
+                            .environmentObject(foldersViewModel)
+                            .transition(.opacity)
+                    }
                 }
-            } message: { folder in
-                Text("""
-                Are you sure you want to delete "\(folder.name)"?
-                All notes inside this folder will move to Recently Deleted.
-                """)
-            }
-
-            // ADD OVERLAY
-            .overlay {
-                if showAddFolder {
-                    AddFolderOverlayView(isPresented: $showAddFolder)
-                        .environmentObject(foldersViewModel)
-                        .transition(.opacity)
-                }
-            }
         }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .onAppear { collapseFab() }
     }
 
-    // ----- PROTECTED FOLDER -----
+    // MARK: - Main List
+
+    private var mainList: some View {
+        List {
+            if isSearching {
+                let base = visibleFolders
+                let folders = searchText.isEmpty
+                    ? base
+                    : base.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+
+                Section(header: Text(searchText.isEmpty ? "Suggested" : "Results")) {
+                    ForEach(folders) { folder in
+                        NavigationLink {
+                            FolderDetailView(folder: folder)
+                        } label: {
+                            Label(folder.name, systemImage: "folder")
+                        }
+                    }
+                }
+
+            } else {
+                // PRIMARY
+                Section {
+                    NavigationLink {
+                        FolderDetailView(folder: nil)
+                    } label: {
+                        Label("Notes", systemImage: "tray.full")
+                    }
+
+                    NavigationLink {
+                        StarredNotesView()
+                    } label: {
+                        Label("Starred", systemImage: "star.fill")
+                    }
+
+                    NavigationLink {
+                        RecentlyDeletedNotesView()
+                    } label: {
+                        Label("Recently Deleted", systemImage: "trash")
+                    }
+                } header: {
+                    Text("Primary")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+                }
+
+                // FOLDERS
+                Section {
+                    ForEach(visibleFolders) { folder in
+                        let isProtected = isProtectedFolder(folder)
+
+                        HStack {
+                            NavigationLink {
+                                FolderDetailView(folder: folder)
+                            } label: {
+                                Label(folder.name, systemImage: "folder")
+                            }
+
+                            if isEditingFolders && !isProtected {
+                                Spacer()
+                                Button(role: .destructive) {
+                                    folderToDelete = folder
+                                    isShowingDeleteAlert = true
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                        .foregroundColor(.red)
+                                        .imageScale(.large)
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        }
+                        .deleteDisabled(true)
+                    }
+                    .onMove { indices, offset in
+                        let ids = indices.map { visibleFolders[$0].id }
+                        var all = foldersViewModel.folders
+                        for id in ids {
+                            if let from = all.firstIndex(where: { $0.id == id }) {
+                                let folder = all.remove(at: from)
+                                let to = min(offset, all.count)
+                                all.insert(folder, at: to)
+                            }
+                        }
+                        foldersViewModel.folders = all
+                    }
+                } header: {
+                    HStack {
+                        Text("Folders")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .textCase(.uppercase)
+
+                        Spacer()
+
+                        if !visibleFolders.isEmpty {
+                            Button(isEditingFolders ? "Done" : "Edit") {
+                                withAnimation { isEditingFolders.toggle() }
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.15))
+                            .foregroundColor(.blue)
+                            .cornerRadius(10)
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color(.systemGroupedBackground))
+        .padding(.top, 8)
+        .environment(\.editMode,
+                     .constant(isEditingFolders ? EditMode.active : EditMode.inactive))
+        .onChange(of: visibleFolders.isEmpty) { isEmpty in
+            if isEmpty && isEditingFolders {
+                withAnimation { isEditingFolders = false }
+            }
+        }
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            HStack {
+                Image("smart_notes_logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 55)
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, -8)
+            .padding(.top, 12)
+        }
+
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button {
+                collapseFab()
+                dismissKeyboard()
+                activeSheet = .settings
+            } label: {
+                Image(systemName: "gearshape")
+                    .imageScale(.large)
+            }
+        }
+    }
+
+    // MARK: - Protected Folder
+
     private func isProtectedFolder(_ folder: SNFolder) -> Bool {
         folder.name == "Notes"
     }
 
-    // ----- DELETE -----
+    // MARK: - Delete
+
     private func performConfirmedDelete(folder: SNFolder) {
         guard !isProtectedFolder(folder),
               let idx = foldersViewModel.folders.firstIndex(where: { $0.id == folder.id })
@@ -250,7 +274,8 @@ struct FoldersListView: View {
         foldersViewModel.deleteFolder(at: IndexSet(integer: idx))
     }
 
-    // ----- FAB -----
+    // MARK: - FAB
+
     private var fabStack: some View {
         VStack(spacing: 14) {
             if isFabExpanded {
@@ -288,7 +313,8 @@ struct FoldersListView: View {
         }
     }
 
-    // ----- BOTTOM BAR + SEARCH -----
+    // MARK: - Bottom Bar + Search
+
     private var bottomBarWithSearchAndFab: some View {
         let searchBar = HStack(spacing: 8) {
             HStack(spacing: 8) {
@@ -338,7 +364,8 @@ struct FoldersListView: View {
         return searchBar
     }
 
-    // ----- HELPERS -----
+    // MARK: - Helpers
+
     private func collapseFab() {
         if isFabExpanded {
             withAnimation(.spring()) { isFabExpanded = false }
@@ -350,9 +377,9 @@ struct FoldersListView: View {
     }
 }
 
-/////////////////////////////////////////////////////////////
-
-// ----- AddFolderOverlayView & Deleted Views stay unchanged -----
+//////////////////////////////////////////////////////////////
+// MARK: - Add Folder Overlay
+//////////////////////////////////////////////////////////////
 
 struct AddFolderOverlayView: View {
     @Binding var isPresented: Bool
@@ -425,7 +452,9 @@ struct AddFolderOverlayView: View {
     }
 }
 
-/////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+// MARK: - Recently Deleted Views
+//////////////////////////////////////////////////////////////
 
 struct RecentlyDeletedNotesView: View {
     @EnvironmentObject var notesViewModel: NotesViewModel
@@ -490,7 +519,7 @@ struct DeletedNoteDetailView: View {
     }
 }
 
-/////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
 
 struct FoldersListView_Previews: PreviewProvider {
     static var previews: some View {
