@@ -16,43 +16,30 @@ struct LoginScreen: View {
 
     @FocusState private var focusedField: Field?
 
-    // Is keyboard active?
     private var isKeyboardActive: Bool {
         focusedField != nil
-    }
-
-    // Standard form movement
-    private var keyboardOffset: CGFloat {
-        isKeyboardActive ? -180 : 0     // tweak as needed
-    }
-
-    // Wave needs more lift
-    private var waveOffset: CGFloat {
-        isKeyboardActive ? keyboardOffset * 1.45 : 0
     }
 
     var body: some View {
         ZStack(alignment: .top) {
 
-            // =====================
-            // HEADER WAVE (moves more)
-            // =====================
+            // ===========================
+            // HEADER WAVE (moves perfectly)
+            // ===========================
             VStack(spacing: 0) {
                 Image("Vector 2")
                     .resizable()
                     .scaledToFill()
                     .frame(height: 260)
-                    .offset(y: 20)
+                    .offset(y: 20)      // your tuned wave position
                     .ignoresSafeArea(edges: .top)
 
                 Spacer().frame(height: 0)
             }
-            .offset(y: waveOffset)   // 👈 wave moves MORE
 
-
-            // =====================
-            // CONTENT (Login form)
-            // =====================
+            // ===========================
+            // CONTENT (title + form)
+            // ===========================
             VStack(alignment: .leading, spacing: 0) {
 
                 Spacer().frame(height: 260)
@@ -102,14 +89,14 @@ struct LoginScreen: View {
                         Divider().background(Color.gray.opacity(0.2))
                     }
 
-                    // Error message
+                    // Error
                     if let error = authViewModel.errorMessage {
                         Text(error)
                             .foregroundColor(.red)
                             .font(.caption)
                     }
 
-                    // Remember + Forgot
+                    // Remember me + forgot
                     HStack {
                         Button {
                             rememberMe.toggle()
@@ -161,12 +148,22 @@ struct LoginScreen: View {
 
                 Spacer()
             }
-            .offset(y: keyboardOffset)   // 👈 form moves normally
+            // 👇 THIS IS THE IMPORTANT PART:
+            // Pull content DOWN while root offset moves everything UP.
+            .offset(y: isKeyboardActive ? 60 : 0)
+            .animation(.easeOut(duration: 0.22), value: isKeyboardActive)
             .contentShape(Rectangle())
-            .onTapGesture { focusedField = nil }
+            .onTapGesture {
+                focusedField = nil
+            }
         }
+
+        // ===========================
+        // ROOT OFFSET (moves wave perfectly)
+        // ===========================
+        .offset(y: isKeyboardActive ? -180 : 0)   // keep this exactly
         .animation(.easeOut(duration: 0.22), value: isKeyboardActive)
-        .ignoresSafeArea(.keyboard)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .background(Color.white.ignoresSafeArea())
     }
 }
