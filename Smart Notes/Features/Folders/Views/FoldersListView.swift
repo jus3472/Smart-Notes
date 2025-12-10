@@ -7,7 +7,6 @@ struct FoldersListView: View {
     // FAB state
     @State private var isFabExpanded = false
 
-    // Which sheet is showing (recording / settings)
     private enum ActiveSheet: Identifiable {
         case recording, settings
         var id: Int { hashValue }
@@ -23,18 +22,16 @@ struct FoldersListView: View {
     private var isSearching: Bool {
         isSearchFocused || !searchText.isEmpty
     }
-    private var isKeyboardActive: Bool {
-        isSearchFocused
-    }
+    private var isKeyboardActive: Bool { isSearchFocused }
 
-    // Delete confirmation state
+    // Delete confirmation
     @State private var folderToDelete: SNFolder?
     @State private var isShowingDeleteAlert = false
 
-    // New folder overlay
+    // Add folder overlay
     @State private var showAddFolder = false
 
-    // MARK: - Derived folder list (hide default "Notes" folder)
+    // Visible folders excluding system folder
     private var visibleFolders: [SNFolder] {
         foldersViewModel.folders.filter { !isProtectedFolder($0) }
     }
@@ -43,13 +40,10 @@ struct FoldersListView: View {
         NavigationStack {
             List {
                 if isSearching {
-                    // ===== SEARCH MODE =====
                     let base = visibleFolders
                     let folders = searchText.isEmpty
                         ? base
-                        : base.filter {
-                            $0.name.localizedCaseInsensitiveContains(searchText)
-                        }
+                        : base.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
 
                     Section(header: Text(searchText.isEmpty ? "Suggested" : "Results")) {
                         ForEach(folders) { folder in
@@ -62,25 +56,17 @@ struct FoldersListView: View {
                     }
 
                 } else {
-                    // ===== NORMAL MODE =====
-
-                    // MARK: Primary section: Notes, Starred, Recently Deleted
+                    // PRIMARY
                     Section {
-                        NavigationLink {
-                            FolderDetailView(folder: nil)
-                        } label: {
+                        NavigationLink { FolderDetailView(folder: nil) } label: {
                             Label("Notes", systemImage: "tray.full")
                         }
 
-                        NavigationLink {
-                            StarredNotesView()
-                        } label: {
+                        NavigationLink { StarredNotesView() } label: {
                             Label("Starred", systemImage: "star.fill")
                         }
 
-                        NavigationLink {
-                            RecentlyDeletedNotesView()
-                        } label: {
+                        NavigationLink { RecentlyDeletedNotesView() } label: {
                             Label("Recently Deleted", systemImage: "trash")
                         }
                     } header: {
@@ -90,7 +76,7 @@ struct FoldersListView: View {
                             .textCase(.uppercase)
                     }
 
-                    // MARK: Folder list (excluding default "Notes" folder)
+                    // FOLDERS
                     Section {
                         ForEach(visibleFolders) { folder in
                             let isProtected = isProtectedFolder(folder)
@@ -102,19 +88,17 @@ struct FoldersListView: View {
                                     Label(folder.name, systemImage: "folder")
                                 }
 
-                                if isEditingFolders {
+                                if isEditingFolders && !isProtected {
                                     Spacer()
-                                    if !isProtected {
-                                        Button(role: .destructive) {
-                                            folderToDelete = folder
-                                            isShowingDeleteAlert = true
-                                        } label: {
-                                            Image(systemName: "minus.circle.fill")
-                                                .foregroundColor(.red)
-                                                .imageScale(.large)
-                                        }
-                                        .buttonStyle(.borderless)
+                                    Button(role: .destructive) {
+                                        folderToDelete = folder
+                                        isShowingDeleteAlert = true
+                                    } label: {
+                                        Image(systemName: "minus.circle.fill")
+                                            .foregroundColor(.red)
+                                            .imageScale(.large)
                                     }
+                                    .buttonStyle(.borderless)
                                 }
                             }
                             .deleteDisabled(true)
@@ -131,7 +115,6 @@ struct FoldersListView: View {
                             }
                             foldersViewModel.folders = all
                         }
-
                     } header: {
                         HStack {
                             Text("Folders")
@@ -157,14 +140,35 @@ struct FoldersListView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemGroupedBackground))
+            .padding(.top, 8)
+
+            // TAP ANYWHERE -> dismiss keyboard + collapse FAB
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    collapseFab()
+                    dismissKeyboard()
+                }
+            )
+
+            // CONTROL SWIFTUI EDIT MODE
             .environment(\.editMode,
                          .constant(isEditingFolders ? EditMode.active : EditMode.inactive))
 
-            // -------- CUSTOM NAVIGATION BAR WITH LOGO --------
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            // FIX: if all folders deleted, exit edit mode before button disappears
+            .onChange(of: visibleFolders.isEmpty) { isEmpty in
+                if isEmpty && isEditingFolders {
+                    withAnimation { isEditingFolders = false }
+                }
+            }
 
-                // CENTER LOGO (PNG)
+            // ---------- TOOLBAR ----------
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.clear, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+
+            .toolbar {
                 ToolbarItem(placement: .principal) {
                     HStack {
                         Image("smart_notes_logo")
@@ -174,12 +178,13 @@ struct FoldersListView: View {
                         Spacer(minLength: 0)
                     }
                     .padding(.leading, -8)
+                    .padding(.top, 12)
                 }
 
-                // GEAR ICON (right side)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         collapseFab()
+                        dismissKeyboard()
                         activeSheet = .settings
                     } label: {
                         Image(systemName: "gearshape")
@@ -187,75 +192,71 @@ struct FoldersListView: View {
                     }
                 }
             }
-            // -------------------------------------------------
 
+            // ---------- BOTTOM SEARCH + FAB ----------
             .safeAreaInset(edge: .bottom) {
-                // hide search bar + FAB while overlay is visible
                 if !showAddFolder {
                     bottomBarWithSearchAndFab
                 }
             }
+
             .sheet(item: $activeSheet) { sheet in
                 switch sheet {
-                case .recording:
-                    RecordingView()
-                case .settings:
-                    SettingsView()
+                case .recording: RecordingView()
+                case .settings: SettingsView()
                 }
             }
+
+            // DELETE ALERT
             .alert("Delete Folder?",
                    isPresented: $isShowingDeleteAlert,
                    presenting: folderToDelete) { folder in
-                Button("Cancel", role: .cancel) { }
+                Button("Cancel", role: .cancel) {}
                 Button("Delete", role: .destructive) {
                     performConfirmedDelete(folder: folder)
                 }
             } message: { folder in
                 Text("""
                 Are you sure you want to delete "\(folder.name)"?
-                All notes inside this folder will be moved to Recently Deleted.
+                All notes inside this folder will move to Recently Deleted.
                 """)
             }
-            // Overlay for creating folder
+
+            // ADD OVERLAY
             .overlay {
                 if showAddFolder {
                     AddFolderOverlayView(isPresented: $showAddFolder)
                         .environmentObject(foldersViewModel)
                         .transition(.opacity)
-                        .animation(.easeInOut, value: showAddFolder)
                 }
             }
         }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .onAppear { collapseFab() }
     }
 
-    // MARK: - Protected folder logic
-
+    // ----- PROTECTED FOLDER -----
     private func isProtectedFolder(_ folder: SNFolder) -> Bool {
         folder.name == "Notes"
     }
 
-    // MARK: - Delete helpers
-
+    // ----- DELETE -----
     private func performConfirmedDelete(folder: SNFolder) {
         guard !isProtectedFolder(folder),
-              let index = foldersViewModel.folders.firstIndex(where: { $0.id == folder.id })
+              let idx = foldersViewModel.folders.firstIndex(where: { $0.id == folder.id })
         else { return }
 
         notesViewModel.deleteNotes(inFolder: folder)
-
-        let set = IndexSet(integer: index)
-        foldersViewModel.deleteFolder(at: set)
+        foldersViewModel.deleteFolder(at: IndexSet(integer: idx))
     }
 
-    // MARK: - FAB
-
+    // ----- FAB -----
     private var fabStack: some View {
         VStack(spacing: 14) {
             if isFabExpanded {
                 Button {
                     collapseFab()
-                    showAddFolder = true   // show overlay
+                    showAddFolder = true
                 } label: {
                     Image("FAB_create_folder")
                         .resizable()
@@ -287,8 +288,7 @@ struct FoldersListView: View {
         }
     }
 
-    // MARK: - Search bar + FAB
-
+    // ----- BOTTOM BAR + SEARCH -----
     private var bottomBarWithSearchAndFab: some View {
         let searchBar = HStack(spacing: 8) {
             HStack(spacing: 8) {
@@ -311,11 +311,7 @@ struct FoldersListView: View {
             .padding(.vertical, 13)
             .background(Color(.systemGray5))
             .clipShape(Capsule())
-            // expand when keyboard up
-            .frame(
-                maxWidth: isKeyboardActive ? .infinity : 260,
-                alignment: .leading
-            )
+            .frame(maxWidth: isKeyboardActive ? .infinity : 260)
             .animation(.easeOut(duration: 0.2), value: isKeyboardActive)
 
             Spacer(minLength: 0)
@@ -324,49 +320,52 @@ struct FoldersListView: View {
         .padding(.top, 16)
         .padding(.bottom, isKeyboardActive ? 20 : 3)
         .contentShape(Rectangle())
-        .onTapGesture { collapseFab() }
+        .onTapGesture {
+            collapseFab()
+            dismissKeyboard()
+        }
+        .background(.ultraThinMaterial)
+        .overlay(
+            Group {
+                if !isKeyboardActive {
+                    fabStack
+                        .padding(.trailing, 16)
+                        .padding(.bottom, -15)
+                }
+            }, alignment: .bottomTrailing
+        )
 
         return searchBar
-            .background(.ultraThinMaterial)
-            .overlay(
-                Group {
-                    // hide FAB while keyboard active
-                    if !isKeyboardActive {
-                        fabStack
-                            .padding(.trailing, 16)
-                            .padding(.bottom, -15)
-                    }
-                },
-                alignment: .bottomTrailing
-            )
     }
 
-    // MARK: - Helper
-
+    // ----- HELPERS -----
     private func collapseFab() {
         if isFabExpanded {
             withAnimation(.spring()) { isFabExpanded = false }
         }
     }
+
+    private func dismissKeyboard() {
+        isSearchFocused = false
+    }
 }
 
-// MARK: - New Folder Overlay
+/////////////////////////////////////////////////////////////
+
+// ----- AddFolderOverlayView & Deleted Views stay unchanged -----
 
 struct AddFolderOverlayView: View {
     @Binding var isPresented: Bool
     @EnvironmentObject var foldersViewModel: FoldersViewModel
 
-    @State private var folderName: String = ""
+    @State private var folderName = ""
     @FocusState private var isTextFocused: Bool
 
     var body: some View {
         ZStack {
-            // dimmed background
             Color.black.opacity(0.3)
                 .ignoresSafeArea()
-                .onTapGesture {
-                    isPresented = false
-                }
+                .onTapGesture { isPresented = false }
 
             VStack(spacing: 20) {
                 Text("New Folder")
@@ -394,13 +393,16 @@ struct AddFolderOverlayView: View {
                     }
 
                     Button {
-                        createFolder()
+                        let trimmed = folderName.trimmingCharacters(in: .whitespaces)
+                        guard !trimmed.isEmpty else { return }
+                        foldersViewModel.addFolder(name: trimmed)
+                        isPresented = false
                     } label: {
                         Text("Create")
                             .fontWeight(.semibold)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(Color.blue)   // blue confirm button
+                            .background(Color.blue)
                             .foregroundColor(.white)
                             .cornerRadius(14)
                     }
@@ -416,30 +418,18 @@ struct AddFolderOverlayView: View {
             .shadow(radius: 20)
         }
         .onAppear {
-            // focus text field when overlay appears
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 isTextFocused = true
             }
         }
     }
-
-    private func createFolder() {
-        let trimmed = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
-        foldersViewModel.addFolder(name: trimmed)
-        isPresented = false
-    }
 }
 
-// MARK: - Recently Deleted Notes View + Read-only Detail
+/////////////////////////////////////////////////////////////
 
 struct RecentlyDeletedNotesView: View {
     @EnvironmentObject var notesViewModel: NotesViewModel
-
-    private var deletedNotes: [SNNote] {
-        notesViewModel.deletedNotes
-    }
+    private var deletedNotes: [SNNote] { notesViewModel.deletedNotes }
 
     var body: some View {
         Group {
@@ -449,13 +439,11 @@ struct RecentlyDeletedNotesView: View {
                         .font(.system(size: 32))
                         .foregroundColor(.secondary)
                     Text("No recently deleted notes")
-                        .font(.headline)
-                    Text("Deleted notes will appear here for now.")
-                        .font(.subheadline)
+                    Text("Deleted notes will appear here.")
                         .foregroundColor(.secondary)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, 80)
+
             } else {
                 List {
                     ForEach(deletedNotes) { note in
@@ -464,10 +452,9 @@ struct RecentlyDeletedNotesView: View {
                         } label: {
                             NoteRowView(note: note, showStar: false)
                         }
-                        .swipeActions(edge: .trailing) {
-                            Button("Restore") {
-                                notesViewModel.restore(note)
-                            }.tint(.green)
+                        .swipeActions {
+                            Button("Restore") { notesViewModel.restore(note) }
+                                .tint(.green)
 
                             Button("Delete", role: .destructive) {
                                 notesViewModel.deleteForever(note)
@@ -479,7 +466,6 @@ struct RecentlyDeletedNotesView: View {
             }
         }
         .navigationTitle("Recently Deleted")
-        .navigationBarTitleDisplayMode(.large)
     }
 }
 
@@ -492,8 +478,7 @@ struct DeletedNoteDetailView: View {
                     .font(.largeTitle.bold())
 
                 if let deletedAt = note.deletedAt {
-                    Text("Deleted: \(deletedAt.formatted(date: .abbreviated, time: .shortened))")
-                        .font(.subheadline)
+                    Text("Deleted: \(deletedAt.formatted())")
                         .foregroundColor(.gray)
                 }
 
@@ -502,13 +487,13 @@ struct DeletedNoteDetailView: View {
             }
             .padding()
         }
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
+/////////////////////////////////////////////////////////////
+
 struct FoldersListView_Previews: PreviewProvider {
     static var previews: some View {
-        FoldersListView()
-            .environmentObject(NotesViewModel())
+        FoldersListView().environmentObject(NotesViewModel())
     }
 }
