@@ -190,7 +190,32 @@ var body: some View {
     }
 }
 ```
-### B. Soft Delete & Trash Support (Justin & Sean)
+### B. Speaker Diarization Logic (Yuna)
+To implement the **Full Transcript Mode**, **Yuna** created a logic that parses raw text into structured `DiarizedSegment` objects. This allows the app to distinguish between speakers (e.g., Professor vs. Student) and render them with distinct UI styles.
+
+
+<img width="333" height="723" alt="image" src="https://github.com/user-attachments/assets/fc0f7507-5c0f-468f-959b-862a9ee40623" />
+<img width="333" height="723" alt="image" src="https://github.com/user-attachments/assets/d2ebe46e-4e45-4998-9eee-f24b87344e4f" />
+
+
+**💻 Code Highlight: Diarization Parser**
+```swift
+// DetailNoteView.swift (Implemented by Yuna)
+private var diarizedSegments: [DiarizedSegment] {
+    editedContent.split(separator: "\n").compactMap { line in
+        // Parse "Speaker: Text" format
+        let parts = line.split(separator: ":", maxSplits: 1)
+        
+        let speaker = parts[0].trimmingCharacters(in: .whitespaces)
+        let text = parts[1].trimmingCharacters(in: .whitespaces)
+        
+        // Convert to Struct for SwiftUI Loop
+        return DiarizedSegment(speaker: speaker, text: text)
+    }
+}
+```
+
+### C. Soft Delete & Trash Support (Justin & Sean)
 
 **Justin** implemented a **Soft Delete** mechanism. Instead of permanently deleting data, an isDeleted flag is set. Sean then routed these notes to a "Recently Deleted" folder, allowing for restoration.
 
