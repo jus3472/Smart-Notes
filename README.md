@@ -107,7 +107,7 @@ inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
 ### B. Transcript Stability Fix (Yuna)
 
 **Yuna** identified and fixed a critical bug where the transcript would reset when the recording was paused and resumed.
-**💻 Code Highlight: Pause/Resume Logic
+**💻 Code Highlight: Pause/Resume Logic**
 ```swift
 // LiveSpeechRecorderService.swift (Fixed by Yuna)
 func pause() {
@@ -145,7 +145,7 @@ Requirements:
 
 Ken developed a converter function that parses the raw Markdown response from Gemini and formats it into the clean UI components displayed in the app.
 
-**💻 Code Highlight: Markdown to UI Converter
+**💻 Code Highlight: Markdown to UI Converter**
 ```swift
 // DetailNoteView.swift (Implemented by Ken)
 private func buildSummarySections(from rawSummary: String) -> [SummarySection] {
@@ -194,7 +194,7 @@ var body: some View {
 
 **Justin** implemented a **Soft Delete** mechanism. Instead of permanently deleting data, an isDeleted flag is set. Sean then routed these notes to a "Recently Deleted" folder, allowing for restoration.
 
-**💻 Code Highlight: Soft Delete Logic
+**💻 Code Highlight: Soft Delete Logic**
 ```swift
 // NotesViewModel.swift (Implemented by Justin)
 func delete(_ note: SNNote) {
