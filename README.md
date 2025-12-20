@@ -1,4 +1,4 @@
-# 📱 Smart Note: Technical Deep Dive & Code Walkthrough
+# 📱 Smart Notes: Technical Deep Dive & Code Walkthrough
 
 > **Team:** Ken Ryu, Justin Jiang, Yuna Shin, Sean Baek  
 > **Goal:** An intelligent note-taking app featuring Audio Recording, AI Summarization, and Organized Management.
